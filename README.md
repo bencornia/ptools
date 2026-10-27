@@ -42,6 +42,7 @@ pfmt < Client.p            # format standard input to standard output
 pfmt PSrc/Client.p         # print the formatted file
 pfmt -w .                  # format every .p file under the directory in place
 pfmt -l .                  # list the files whose formatting differs
+pfmt -d .                  # print diffs of what formatting would change
 pfmt -indent 2 Client.p    # indent with 2 spaces instead of 4
 ```
 
@@ -82,6 +83,6 @@ changes nothing. All of github.com/p-org/P passes.
 - [x] Refuse code with syntax errors, and check that output has the same tokens
 - [x] `pfmt` command: stdin, files and directories, `-w`, `-l`, `-indent`
 - [x] Tests, and a corpus test over the P repo
-- [ ] `-d` to print diffs instead of formatted files
+- [x] `-d` to print diffs instead of formatted files
 - [ ] `textDocument/formatting` in p-lsp, using the `format` package
 - [ ] Editor setup for Neovim and VS Code

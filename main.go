@@ -2,8 +2,8 @@
 //
 // With no files, it formats standard input to standard output. Given files
 // or directories (searched for .p files), it prints the formatted files, or
-// with -w writes them back, or with -l lists the files whose formatting
-// differs.
+// with -w writes them back, with -l lists the files whose formatting
+// differs, or with -d prints diffs of what formatting would change.
 package main
 
 import (
@@ -16,12 +16,14 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bencornia/pfmt/diff"
 	"github.com/bencornia/pfmt/format"
 )
 
 func main() {
 	write := flag.Bool("w", false, "write the result to the files instead of printing it")
 	list := flag.Bool("l", false, "list the files whose formatting differs")
+	showDiff := flag.Bool("d", false, "print diffs of what formatting would change instead of formatted files")
 	indent := flag.Int("indent", 4, "spaces per indentation level")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: pfmt [flags] [path ...]\n")
@@ -42,13 +44,17 @@ func main() {
 		if err != nil {
 			fail("<stdin>: " + err.Error())
 		}
-		os.Stdout.Write(out)
+		if *showDiff {
+			os.Stdout.Write(diff.Unified("<stdin>.orig", "<stdin>", src, out))
+		} else {
+			os.Stdout.Write(out)
+		}
 		return
 	}
 
 	failed := false
 	for _, path := range files(flag.Args()) {
-		if err := formatFile(path, opts, *write, *list); err != nil {
+		if err := formatFile(path, opts, *write, *list, *showDiff); err != nil {
 			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
 			failed = true
 		}
@@ -85,7 +91,7 @@ func files(args []string) []string {
 	return paths
 }
 
-func formatFile(path string, opts format.Options, write, list bool) error {
+func formatFile(path string, opts format.Options, write, list, showDiff bool) error {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -95,20 +101,20 @@ func formatFile(path string, opts format.Options, write, list bool) error {
 		return err
 	}
 	changed := !bytes.Equal(src, out)
-	switch {
-	case list:
-		if changed {
-			fmt.Println(path)
+	if list && changed {
+		fmt.Println(path)
+	}
+	if showDiff {
+		os.Stdout.Write(diff.Unified(path+".orig", path, src, out))
+	}
+	if write && changed {
+		info, err := os.Stat(path)
+		if err != nil {
+			return err
 		}
-	case write:
-		if changed {
-			info, err := os.Stat(path)
-			if err != nil {
-				return err
-			}
-			return os.WriteFile(path, out, info.Mode().Perm())
-		}
-	default:
+		return os.WriteFile(path, out, info.Mode().Perm())
+	}
+	if !list && !showDiff && !write {
 		os.Stdout.Write(out)
 	}
 	return nil
