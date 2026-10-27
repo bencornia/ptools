@@ -1,0 +1,108 @@
+package format
+
+import (
+	"bytes"
+	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
+
+func TestSource(t *testing.T) {
+	tests := []struct{ name, in, want string }{
+		{"indents blocks",
+			"machine M {\nstart state S {\nentry {\nx = 1;\n}\n}\n}\n",
+			"machine M {\n  start state S {\n    entry {\n      x = 1;\n    }\n  }\n}\n"},
+		{"re-indents", "fun F() {\n        x = 1;\n\t\ty = 2;\n}\n", "fun F() {\n  x = 1;\n  y = 2;\n}\n"},
+		{"brace on its own line", "machine M\n{\n  var x: int;\n}\n", "machine M\n{\n  var x: int;\n}\n"},
+		{"spaces around operators", "fun F() {\n  x=a+b*-c;\n  y += (1);\n  b = !(x==y)&&z;\n}\n",
+			"fun F() {\n  x = a + b * -c;\n  y += (1);\n  b = !(x == y) && z;\n}\n"},
+		{"type annotations", "machine M {\n  var x : int;\n}\nfun F(a:int, b : seq[int]) : map[int,bool] {}\n",
+			"machine M {\n  var x: int;\n}\nfun F(a: int, b: seq[int]): map[int, bool] {}\n"},
+		{"keywords before parentheses", "fun F() {\n  if(x) {}\n  while(y) {}\n  x = sizeof (s) + keys (m)[0];\n}\n",
+			"fun F() {\n  if (x) {}\n  while (y) {}\n  x = sizeof(s) + keys(m)[0];\n}\n"},
+		{"calls and constructors", "fun F() {\n  G (1,2);\n  m = new M ((a = 1,));\n}\n",
+			"fun F() {\n  G(1, 2);\n  m = new M((a = 1,));\n}\n"},
+		{"handlers", "machine M {\n  start state S {\n    entry(x: int){}\n    on e do (p: T){}\n  }\n}\n",
+			"machine M {\n  start state S {\n    entry (x: int) {}\n    on e do (p: T) {}\n  }\n}\n"},
+		{"one-line blocks", "module C = {Client};\nfun F() { return 1; }\n", "module C = { Client };\nfun F() { return 1; }\n"},
+		{"brace-less if", "fun F() {\n  if (x)\n  raise halt;\n  else\n  y = 1;\n  z = 2;\n}\n",
+			"fun F() {\n  if (x)\n    raise halt;\n  else\n    y = 1;\n  z = 2;\n}\n"},
+		{"continued statement", "fun F() {\n  assert x in s,\n  format(\"{0}\",\n  x);\n}\n",
+			"fun F() {\n  assert x in s,\n    format(\"{0}\",\n      x);\n}\n"},
+		{"closing bracket lines up", "fun F() {\n  G(\n      1,\n      2\n      );\n}\n", "fun F() {\n  G(\n    1,\n    2\n  );\n}\n"},
+		{"quantifier", "invariant i: forall (c: C)::c.x;\n", "invariant i: forall (c: C) :: c.x;\n"},
+		{"test declaration", "test t [main=M]:\nassert S in\n(union A, { M });\n",
+			"test t [main=M]:\n  assert S in\n  (union A, { M });\n"},
+		{"parameter list", "test param (n in [2,3]) t [main=M]: (union A, B);\n", "test param (n in [2, 3]) t [main=M]: (union A, B);\n"},
+		{"floats and fields", "fun F() {\n  x = 1.5 + t.0 + r . f;\n}\n", "fun F() {\n  x = 1.5 + t.0 + r.f;\n}\n"},
+		{"comments stay", "// top\n\n\n\nevent e;   // trailing\n/* block\n   comment */\nfun F() {\n    // inside\n  x = 1;\n}\n",
+			"// top\n\nevent e;   // trailing\n/* block\n   comment */\nfun F() {\n  // inside\n  x = 1;\n}\n"},
+		{"trailing whitespace and final newline", "event e;   \n\n\nevent f;", "event e;\n\nevent f;\n"},
+		{"leading blank lines", "\n\nevent e;\n", "event e;\n"},
+		{"empty", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Source([]byte(tt.in), Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(got) != tt.want {
+				t.Errorf("got\n%s\nwant\n%s", got, tt.want)
+			}
+			again, err := Source(got, Options{})
+			if err != nil || !bytes.Equal(again, got) {
+				t.Errorf("formatting again changed it:\n%s", again)
+			}
+		})
+	}
+}
+
+func TestIndentOption(t *testing.T) {
+	got, err := Source([]byte("fun F() {\nx = 1;\n}\n"), Options{Indent: 4})
+	if err != nil || string(got) != "fun F() {\n    x = 1;\n}\n" {
+		t.Errorf("got %q, %v", got, err)
+	}
+}
+
+func TestSyntaxErrorsAreRefused(t *testing.T) {
+	if _, err := Source([]byte("fun F() {\n  x = \n}\n"), Options{}); !errors.Is(err, ErrSyntax) {
+		t.Errorf("got %v, want ErrSyntax", err)
+	}
+}
+
+// TestCorpus formats every .p file under $PFMT_CORPUS, such as a checkout
+// of github.com/p-org/P, and checks that each formats without error and
+// that formatting again changes nothing.
+func TestCorpus(t *testing.T) {
+	root := os.Getenv("PFMT_CORPUS")
+	if root == "" {
+		t.Skip("set PFMT_CORPUS to a directory of P code")
+	}
+	files, refused := 0, 0
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil || !strings.HasSuffix(path, ".p") || strings.HasPrefix(info.Name(), "._") {
+			return nil
+		}
+		src, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		files++
+		out, err := Source(src, Options{})
+		switch {
+		case errors.Is(err, ErrSyntax):
+			refused++
+		case err != nil:
+			t.Errorf("%s: %v", path, err)
+		default:
+			if again, err := Source(out, Options{}); err != nil || !bytes.Equal(again, out) {
+				t.Errorf("%s: formatting again changed it", path)
+			}
+		}
+		return nil
+	})
+	t.Logf("%d files, %d refused for syntax errors", files, refused)
+}
