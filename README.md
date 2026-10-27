@@ -39,7 +39,7 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 - [x] Go to definition for tuple fields, and the P verifier's machine and event fields
 - [x] Go to definition for fields in tuple values, like `(source = this)`, from the type their context expects
 - [x] Find references
-- [ ] Narrower fallback for files in no `.pproj` (they currently see the whole workspace, so duplicate names across unrelated examples show up in definitions and references)
+- [x] Narrower fallback for files in no `.pproj`: their example (under the `PSrc`/`PSpec`/`PTst` layout) or their own directory, not the whole workspace
 - [ ] Hover (show a symbol's declaration)
 - [ ] Rename
 - [ ] Workspace symbol search

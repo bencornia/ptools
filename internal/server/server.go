@@ -3,6 +3,7 @@ package server
 
 import (
 	"maps"
+	"path/filepath"
 	"slices"
 	"sync"
 
@@ -224,12 +225,22 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 }
 
 // visibleDocs returns the documents compiled together with the one at path,
-// sorted by path: its projects' files, or every document if no project lists
-// it. Callers must hold mu.
+// sorted by path: its projects' files, or for a file no project lists, the
+// files under its project.FallbackRoot. Callers must hold mu.
 func (s *Server) visibleDocs(path string) []*analysis.Document {
-	paths, ok := s.projects.Visible(path)
-	if !ok {
+	if paths, ok := s.projects.Visible(path); ok {
+		return s.docsAt(paths)
+	}
+	if !filepath.IsAbs(path) {
+		// An unsaved buffer, such as untitled:Untitled-1, has no directory.
 		return s.allDocs()
+	}
+	root := project.FallbackRoot(path)
+	var paths []string
+	for p := range s.docs {
+		if project.Within(p, root) {
+			paths = append(paths, p)
+		}
 	}
 	return s.docsAt(paths)
 }

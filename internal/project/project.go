@@ -115,3 +115,33 @@ func Find(root string) (pFiles, projects []string, err error) {
 func isPFile(path string) bool {
 	return strings.EqualFold(filepath.Ext(path), ".p")
 }
+
+// layoutDirs are the directories of the conventional P project layout.
+var layoutDirs = []string{"PSrc", "PSpec", "PTst", "PForeign"}
+
+// FallbackRoot guesses the directory whose files are compiled with a file
+// that no project lists. Under the conventional layout that's the directory
+// holding the nearest enclosing PSrc, PSpec, PTst or PForeign; otherwise it's
+// the file's own directory, as with the P repo's regression tests.
+func FallbackRoot(file string) string {
+	dir := filepath.Dir(file)
+	for d := dir; ; {
+		name := filepath.Base(d)
+		for _, layout := range layoutDirs {
+			if strings.EqualFold(name, layout) {
+				return filepath.Dir(d)
+			}
+		}
+		parent := filepath.Dir(d)
+		if parent == d {
+			return dir
+		}
+		d = parent
+	}
+}
+
+// Within reports whether path is dir or inside it.
+func Within(path, dir string) bool {
+	rel, err := filepath.Rel(dir, path)
+	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+}

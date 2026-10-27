@@ -478,3 +478,66 @@ func TestReferencesStayInTheProject(t *testing.T) {
 	}
 	assertDefinitions(t, got, "App/PSrc/Events.p:1", "App/PSrc/Main.p:3")
 }
+
+func TestFilesWithoutAProjectSeeTheirOwnExample(t *testing.T) {
+	s, root := start(t, map[string]string{
+		// Two copies of an example in the P layout, with no .pproj.
+		"Examples/One/PSrc/Main.p":    mainP,
+		"Examples/One/PSpec/Events.p": "event eFoo;\n",
+		"Examples/Two/PSrc/Main.p":    mainP,
+		"Examples/Two/PSpec/Events.p": "event eFoo;\n",
+		// Two regression tests, one directory each.
+		"Tst/Test1/test.p":   mainP + "event eFoo;\n",
+		"Tst/Test2/test.p":   mainP + "event eFoo;\n",
+		"Tst/Test2/extra.p":  "event eBar;\n",
+		"Tst/Test1/helper.p": "event eBaz;\n",
+	}, client{})
+
+	// Across PSrc and PSpec of the same example, but not the other copy.
+	assertDefinitions(t, definitionOf(t, s, root, "Examples/One/PSrc/Main.p", "eFoo"), "Examples/One/PSpec/Events.p:1")
+	assertDefinitions(t, definitionOf(t, s, root, "Examples/Two/PSrc/Main.p", "eFoo"), "Examples/Two/PSpec/Events.p:1")
+	// Within one test's directory.
+	assertDefinitions(t, definitionOf(t, s, root, "Tst/Test1/test.p", "eFoo"), "Tst/Test1/test.p:6")
+
+	locs, err := s.references(fakeContext(nil), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: pathToURI(filepath.Join(root, "Examples/One/PSpec/Events.p"))},
+			Position:     protocol.Position{Line: 0, Character: 6},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, loc := range locs {
+		rel, _ := filepath.Rel(root, uriToPath(loc.URI))
+		got = append(got, rel+":"+itoa(int(loc.Range.Start.Line)+1))
+	}
+	assertDefinitions(t, got, "Examples/One/PSpec/Events.p:1", "Examples/One/PSrc/Main.p:3")
+}
+
+func TestUnsavedBufferSeesTheWorkspace(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"Tst/Test1/events.p": "event eFoo;\n",
+	}, client{})
+	uri := "untitled:Untitled-1"
+	if err := s.didOpen(fakeContext(nil), &protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{
+		URI: uri, LanguageID: "p", Version: 1, Text: mainP,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	result, err := s.definition(fakeContext(nil), &protocol.DefinitionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+			Position:     protocol.Position{Line: 2, Character: 7},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	locs, _ := result.([]protocol.Location)
+	if len(locs) != 1 || uriToPath(locs[0].URI) != filepath.Join(root, "Tst/Test1/events.p") {
+		t.Errorf("got %+v, want the definition in Tst/Test1/events.p", locs)
+	}
+}

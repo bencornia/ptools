@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/bencornia/p-lsp/internal/project"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
@@ -159,7 +160,7 @@ func (s *Server) externalProjectDirs() []string {
 
 func (s *Server) inWorkspace(path string) bool {
 	for _, root := range s.roots {
-		if rel, err := filepath.Rel(root, path); err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		if project.Within(path, root) {
 			return true
 		}
 	}

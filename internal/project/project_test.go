@@ -142,3 +142,39 @@ func TestFind(t *testing.T) {
 		t.Errorf("projects = %v, want %v", projects, want)
 	}
 }
+
+func TestFallbackRoot(t *testing.T) {
+	tests := []struct{ file, want string }{
+		{"/w/Raft/PSrc/Server.p", "/w/Raft"},
+		{"/w/Raft/PSpec/Safety.p", "/w/Raft"},
+		{"/w/Raft/PSrc/nested/Types.p", "/w/Raft"},
+		{"/w/Raft/psrc/Server.p", "/w/Raft"},
+		{"/w/Tst/Correct/Test1/main.p", "/w/Tst/Correct/Test1"},
+		{"/w/App/fixed_responses/Stray.p", "/w/App/fixed_responses"},
+		{"/Single.p", "/"},
+	}
+	for _, tt := range tests {
+		file, want := filepath.FromSlash(tt.file), filepath.FromSlash(tt.want)
+		if got := FallbackRoot(file); got != want {
+			t.Errorf("FallbackRoot(%s) = %s, want %s", tt.file, got, want)
+		}
+	}
+}
+
+func TestWithin(t *testing.T) {
+	tests := []struct {
+		path, dir string
+		want      bool
+	}{
+		{"/w/a/b.p", "/w/a", true},
+		{"/w/a", "/w/a", true},
+		{"/w/ab/c.p", "/w/a", false},
+		{"/w/b.p", "/w/a", false},
+		{"/w/..data/x.p", "/w", true},
+	}
+	for _, tt := range tests {
+		if got := Within(filepath.FromSlash(tt.path), filepath.FromSlash(tt.dir)); got != tt.want {
+			t.Errorf("Within(%s, %s) = %v, want %v", tt.path, tt.dir, got, tt.want)
+		}
+	}
+}
