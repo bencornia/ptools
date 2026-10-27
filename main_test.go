@@ -270,6 +270,7 @@ func TestProtocol(t *testing.T) {
 		"workspaceSymbolProvider": `true`,
 		"foldingRangeProvider":    `true`,
 		"selectionRangeProvider":  `true`,
+		"codeActionProvider":      `"codeActionKinds":["quickfix"]`,
 	} {
 		if got := string(init.Capabilities[capability]); !strings.Contains(got, want) {
 			t.Errorf("capability %s = %s, want it to contain %s", capability, got, want)

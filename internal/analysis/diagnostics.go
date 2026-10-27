@@ -24,6 +24,9 @@ func collectSyntaxErrors(doc *Document, node *sitter.Node, out *[]protocol.Diagn
 		*out = append(*out, syntaxDiagnostic(doc.Range(node), unexpectedMessage(doc, node)))
 		// Anything inside an ERROR node is part of the same mistake.
 		return
+	case isMissingTupleComma(node):
+		*out = append(*out, syntaxDiagnostic(doc.Range(node), missingTupleCommaMessage(doc, node.Parent())))
+		return
 	case node.IsMissing():
 		*out = append(*out, syntaxDiagnostic(doc.Range(node), fmt.Sprintf("expected `%s`", node.Kind())))
 		return

@@ -77,6 +77,7 @@ func New(version string) *Server {
 		TextDocumentReferences:          s.references,
 		TextDocumentHover:               s.hover,
 		TextDocumentCompletion:          s.completion,
+		TextDocumentCodeAction:          s.codeAction,
 		TextDocumentFoldingRange:        s.foldingRange,
 		TextDocumentSelectionRange:      s.selectionRange,
 		TextDocumentSemanticTokensFull:  s.semanticTokensFull,
@@ -122,6 +123,10 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	capabilities.RenameProvider = protocol.RenameOptions{PrepareProvider: &prepare}
 
 	capabilities.SemanticTokensProvider.(*protocol.SemanticTokensOptions).Legend = analysis.TokenLegend
+
+	capabilities.CodeActionProvider = protocol.CodeActionOptions{
+		CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+	}
 
 	// Complete fields as soon as a `.` is typed.
 	capabilities.CompletionProvider.TriggerCharacters = []string{"."}
@@ -197,6 +202,45 @@ func (s *Server) documentSymbol(_ *glsp.Context, params *protocol.DocumentSymbol
 		return nil, nil
 	}
 	return analysis.Symbols(doc), nil
+}
+
+// codeAction offers the fixes for problems in the requested range.
+func (s *Server) codeAction(_ *glsp.Context, params *protocol.CodeActionParams) (any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil, nil
+	}
+	actions := []protocol.CodeAction{}
+	kind := protocol.CodeActionKindQuickFix
+	preferred := true
+	for _, f := range analysis.Fixes(s.visibleDocs(path), doc) {
+		if !overlaps(f.Diagnostic.Range, params.Range) {
+			continue
+		}
+		actions = append(actions, protocol.CodeAction{
+			Title:       f.Title,
+			Kind:        &kind,
+			Diagnostics: []protocol.Diagnostic{f.Diagnostic},
+			IsPreferred: &preferred,
+			Edit: &protocol.WorkspaceEdit{
+				Changes: map[protocol.DocumentUri][]protocol.TextEdit{params.TextDocument.URI: f.Edits},
+			},
+		})
+	}
+	return actions, nil
+}
+
+// overlaps reports whether two ranges share a position, counting a range's
+// end, so a cursor just after a problem still gets its fix.
+func overlaps(a, b protocol.Range) bool {
+	return !before(a.End, b.Start) && !before(b.End, a.Start)
+}
+
+func before(a, b protocol.Position) bool {
+	return a.Line < b.Line || a.Line == b.Line && a.Character < b.Character
 }
 
 func (s *Server) foldingRange(_ *glsp.Context, params *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {

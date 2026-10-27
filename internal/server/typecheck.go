@@ -109,7 +109,7 @@ func (s *Server) compileDiagnostic(path string, e compile.Error) protocol.Diagno
 func (s *Server) diagnosticsFor(path string) []protocol.Diagnostic {
 	diagnostics := []protocol.Diagnostic{}
 	if doc, ok := s.docs[path]; ok && s.open[path] {
-		diagnostics = append(diagnostics, analysis.SyntaxDiagnostics(doc)...)
+		diagnostics = append(diagnostics, analysis.Diagnostics(s.visibleDocs(path), doc)...)
 	}
 	for _, pproj := range slices.Sorted(maps.Keys(s.compileDiagnostics)) {
 		diagnostics = append(diagnostics, s.compileDiagnostics[pproj][path]...)

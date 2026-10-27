@@ -641,3 +641,40 @@ func TestRenameStaysInTheProject(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestCodeActionFixesOneFieldTuple(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":     appProject,
+		"App/PSrc/Events.p": "event eFoo: (n: int);\n",
+		"App/PSrc/Main.p":   "machine M {\n  start state S {\n    entry { send this, eFoo, (n = 1); }\n  }\n}\n",
+	}, client{})
+	uri := pathToURI(filepath.Join(root, "App/PSrc/Main.p"))
+	open(t, s, root, "App/PSrc/Main.p")
+
+	// The cursor on the `)` the comma goes before.
+	cursor := protocol.Position{Line: 2, Character: 35}
+	result, err := s.codeAction(fakeContext(nil), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range:        protocol.Range{Start: cursor, End: cursor},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := result.([]protocol.CodeAction)
+	if len(actions) != 1 {
+		t.Fatalf("got %d actions, want 1", len(actions))
+	}
+	edits := actions[0].Edit.Changes[uri]
+	if actions[0].Title != "Add a trailing comma" || len(edits) != 1 || edits[0].NewText != "," || edits[0].Range.Start != cursor {
+		t.Errorf("got %q with edits %+v", actions[0].Title, edits)
+	}
+
+	// Elsewhere, nothing to fix.
+	result, _ = s.codeAction(fakeContext(nil), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range:        protocol.Range{Start: protocol.Position{Line: 0}, End: protocol.Position{Line: 0, Character: 3}},
+	})
+	if got := result.([]protocol.CodeAction); len(got) != 0 {
+		t.Errorf("got %d actions on the first line", len(got))
+	}
+}
