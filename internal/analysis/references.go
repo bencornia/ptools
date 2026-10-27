@@ -23,25 +23,54 @@ func References(candidates []*Document, workspaceOf func(*Document) []*Document,
 		return nil
 	}
 
-	// Nodes from different parses of a file are never compared: every
-	// document here comes from the same snapshot.
-	type nodeKey struct {
-		doc   *Document
-		start uint
+	locs := []protocol.Location{}
+	for _, r := range referencesTo(candidates, workspaceOf, targets, includeDeclaration) {
+		locs = append(locs, protocol.Location{URI: r.doc.URI, Range: r.doc.Range(r.node)})
 	}
+	slices.SortFunc(locs, func(a, b protocol.Location) int {
+		return cmp.Or(
+			cmp.Compare(a.URI, b.URI),
+			cmp.Compare(a.Range.Start.Line, b.Range.Start.Line),
+			cmp.Compare(a.Range.Start.Character, b.Range.Start.Character),
+		)
+	})
+	return locs
+}
+
+// reference is an identifier that refers to a declaration, or the
+// declaration's own name.
+type reference struct {
+	doc  *Document
+	node *sitter.Node
+}
+
+// nodeKey identifies a node. Nodes from different parses of a file are never
+// compared: every document here comes from the same snapshot.
+type nodeKey struct {
+	doc   *Document
+	start uint
+}
+
+func keyOf(doc *Document, node *sitter.Node) nodeKey {
+	return nodeKey{doc, node.StartByte()}
+}
+
+// referencesTo returns the identifiers in candidates that resolve to one of
+// targets, and the targets' own names if includeDeclaration.
+func referencesTo(candidates []*Document, workspaceOf func(*Document) []*Document, targets []declaration, includeDeclaration bool) []reference {
 	isTarget := map[nodeKey]bool{}
 	names := map[string]bool{}
 	for _, t := range targets {
-		isTarget[nodeKey{t.doc, t.node.StartByte()}] = true
+		isTarget[keyOf(t.doc, t.node)] = true
 		names[t.name] = true
 	}
 
-	locs := []protocol.Location{}
+	refs := []reference{}
 	seen := map[nodeKey]bool{}
 	add := func(d *Document, n *sitter.Node) {
-		if k := (nodeKey{d, n.StartByte()}); !seen[k] {
+		if k := keyOf(d, n); !seen[k] {
 			seen[k] = true
-			locs = append(locs, protocol.Location{URI: d.URI, Range: d.Range(n)})
+			refs = append(refs, reference{d, n})
 		}
 	}
 	if includeDeclaration {
@@ -58,26 +87,18 @@ func References(candidates []*Document, workspaceOf func(*Document) []*Document,
 		}
 		workspace := workspaceOf(candidate)
 		forEachIdentifier(candidate.Tree.RootNode(), func(n *sitter.Node) {
-			if !names[n.Utf8Text(candidate.Text)] || isTarget[nodeKey{candidate, n.StartByte()}] {
+			if !names[n.Utf8Text(candidate.Text)] || isTarget[keyOf(candidate, n)] {
 				return
 			}
 			for _, d := range resolve(workspace, candidate, n) {
-				if isTarget[nodeKey{d.doc, d.node.StartByte()}] {
+				if isTarget[keyOf(d.doc, d.node)] {
 					add(candidate, n)
 					return
 				}
 			}
 		})
 	}
-
-	slices.SortFunc(locs, func(a, b protocol.Location) int {
-		return cmp.Or(
-			cmp.Compare(a.URI, b.URI),
-			cmp.Compare(a.Range.Start.Line, b.Range.Start.Line),
-			cmp.Compare(a.Range.Start.Character, b.Range.Start.Character),
-		)
-	})
-	return locs
+	return refs
 }
 
 func mentionsAny(text []byte, names map[string]bool) bool {

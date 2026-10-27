@@ -41,7 +41,7 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 - [x] Find references
 - [x] Narrower fallback for files in no `.pproj`: their example (under the `PSrc`/`PSpec`/`PTst` layout) or their own directory, not the whole workspace
 - [x] Hover: a symbol's signature, doc comment, and file if declared elsewhere
-- [ ] Rename
+- [x] Rename, refusing renames that collide with or capture another name
 - [ ] Workspace symbol search
 - [ ] Type-check diagnostics from `p compile` on save
 - [ ] Completion of names in scope

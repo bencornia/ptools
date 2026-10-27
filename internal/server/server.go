@@ -68,6 +68,8 @@ func New(version string) *Server {
 		TextDocumentDefinition:         s.definition,
 		TextDocumentReferences:         s.references,
 		TextDocumentHover:              s.hover,
+		TextDocumentPrepareRename:      s.prepareRename,
+		TextDocumentRename:             s.rename,
 		WorkspaceDidChangeWatchedFiles: s.didChangeWatchedFiles,
 	}
 	return s
@@ -99,6 +101,11 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	// full text on every change rather than applying incremental edits.
 	full := protocol.TextDocumentSyncKindFull
 	capabilities.TextDocumentSync.(*protocol.TextDocumentSyncOptions).Change = &full
+
+	// glsp advertises plain renameProvider: true; say we also check whether
+	// a name can be renamed before the client asks for the new name.
+	prepare := true
+	capabilities.RenameProvider = protocol.RenameOptions{PrepareProvider: &prepare}
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
@@ -194,6 +201,51 @@ func (s *Server) hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol
 	return analysis.Hover(s.visibleDocs(path), doc, params.Position), nil
 }
 
+func (s *Server) prepareRename(_ *glsp.Context, params *protocol.PrepareRenameParams) (any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil, nil
+	}
+	if rng := analysis.PrepareRename(s.visibleDocs(path), doc, params.Position); rng != nil {
+		return rng, nil
+	}
+	return nil, nil
+}
+
+func (s *Server) rename(_ *glsp.Context, params *protocol.RenameParams) (*protocol.WorkspaceEdit, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, ok := s.docs[key(params.TextDocument.URI)]
+	if !ok {
+		return nil, nil
+	}
+	changes, err := analysis.Rename(s.allDocs(), s.workspaceOf(), doc, params.Position, params.NewName)
+	if err != nil {
+		// The client shows this message to the user.
+		return nil, err
+	}
+	return &protocol.WorkspaceEdit{Changes: changes}, nil
+}
+
+// workspaceOf returns a function giving the documents each document is
+// resolved against, which are the same for every identifier in it, so
+// they're cached for the length of one request. Callers must hold mu while
+// using it.
+func (s *Server) workspaceOf() func(*analysis.Document) []*analysis.Document {
+	cache := map[*analysis.Document][]*analysis.Document{}
+	return func(d *analysis.Document) []*analysis.Document {
+		if w, ok := cache[d]; ok {
+			return w
+		}
+		w := s.visibleDocs(key(d.URI))
+		cache[d] = w
+		return w
+	}
+}
+
 func (s *Server) references(_ *glsp.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -202,19 +254,7 @@ func (s *Server) references(_ *glsp.Context, params *protocol.ReferenceParams) (
 	if !ok {
 		return nil, nil
 	}
-
-	// Each document is resolved against the files it's compiled with, which
-	// are the same for every identifier in it.
-	workspaces := map[*analysis.Document][]*analysis.Document{}
-	workspaceOf := func(d *analysis.Document) []*analysis.Document {
-		if w, ok := workspaces[d]; ok {
-			return w
-		}
-		w := s.visibleDocs(key(d.URI))
-		workspaces[d] = w
-		return w
-	}
-	return analysis.References(s.allDocs(), workspaceOf, doc, params.Position, params.Context.IncludeDeclaration), nil
+	return analysis.References(s.allDocs(), s.workspaceOf(), doc, params.Position, params.Context.IncludeDeclaration), nil
 }
 
 // update re-parses an open document and publishes its diagnostics.
