@@ -121,3 +121,18 @@ func TestUnclearSyntaxErrorsHaveNoFix(t *testing.T) {
 		t.Error("the error isn't reported")
 	}
 }
+
+func TestEmptyReceive(t *testing.T) {
+	doc := parse(t, "fun F() {\n  receive {\n  }\n}\n")
+	if diags := SyntaxDiagnostics(doc); len(diags) != 0 {
+		t.Fatalf("an empty receive should parse, got %+v", diags)
+	}
+	diags := Diagnostics([]*Document{doc}, doc)
+	if len(diags) != 1 || diags[0].Message != "`receive` needs at least one `case`" || diags[0].Range.Start.Line != 1 {
+		t.Errorf("got %+v", diags)
+	}
+	doc = parse(t, "event e;\nfun F() {\n  receive {\n    case e: {}\n  }\n}\n")
+	if diags := Diagnostics([]*Document{doc}, doc); len(diags) != 0 {
+		t.Errorf("with a case, got %+v", diags)
+	}
+}

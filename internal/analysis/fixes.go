@@ -52,7 +52,22 @@ func Fixes(workspace []*Document, doc *Document) []Fix {
 func semanticFixes(workspace []*Document, doc *Document) []Fix {
 	fixes := typeFixes(workspace, doc)
 	fixes = append(fixes, undefinedEventFixes(workspace, doc)...)
-	return append(fixes, undefinedNameFixes(workspace, doc)...)
+	fixes = append(fixes, undefinedNameFixes(workspace, doc)...)
+	return append(fixes, emptyReceives(doc)...)
+}
+
+// emptyReceives reports `receive` statements with no cases, which P
+// rejects. The grammar allows them so that editors can indent the first
+// case as it's typed.
+func emptyReceives(doc *Document) []Fix {
+	problems := []Fix{}
+	doc.walk(func(n *sitter.Node) bool {
+		if n.Kind() == "receive_statement" && firstChildOfKind(n, "recv_case") == nil {
+			problems = append(problems, Fix{Diagnostic: syntaxDiagnostic(doc.Range(n.Child(0)), "`receive` needs at least one `case`")})
+		}
+		return true
+	})
+	return problems
 }
 
 // isMissingTupleComma reports whether n is the comma tree-sitter expected
@@ -74,7 +89,7 @@ func missingTupleCommaMessage(doc *Document, body *sitter.Node) string {
 // tuple is expected: P reads them as the value itself, not a tuple.
 func typeFixes(workspace []*Document, doc *Document) []Fix {
 	fixes := []Fix{}
-	walkNodes(doc.Tree.RootNode(), func(n *sitter.Node) bool {
+	doc.walk(func(n *sitter.Node) bool {
 		if n.Kind() != "paren_expression" {
 			return true
 		}
@@ -158,7 +173,7 @@ func isNotTuple(workspace []*Document, doc *Document, expr *sitter.Node) bool {
 		}
 		// A primitive type, which has no node of its own; `any` and `data`
 		// can hold tuples.
-		decl := decls[0].node.Parent()
+		decl := decls[0].parent()
 		if decl.Kind() == "identifier_list" {
 			decl = decl.Parent()
 		}

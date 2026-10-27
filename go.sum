@@ -1,7 +1,7 @@
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1/go.mod h1:uYgXzlJ7ZpABp8OJ+exZzJJhRNQ2ASbcXHWsFqH8hp8=
-github.com/bencornia/tree-sitter-p v0.0.0-20261027183932-7778bce878c7 h1:IKzSGqk/CMxhhY8eG6uxTGvEd/QXrr7SATrjFEeFFV4=
-github.com/bencornia/tree-sitter-p v0.0.0-20261027183932-7778bce878c7/go.mod h1:EUT4ZH1JlTxM2a7G6u6C02u4JZDNdLDu/SwTLLQlU7g=
+github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a h1:FeFLGhbFp5Ms1H2JbM2sZjYPPiz73S0lephjJyLWS+o=
+github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a/go.mod h1:EUT4ZH1JlTxM2a7G6u6C02u4JZDNdLDu/SwTLLQlU7g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=

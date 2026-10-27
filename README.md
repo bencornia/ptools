@@ -91,7 +91,7 @@ language-servers = ["p-lsp"]
 
 [[grammar]]
 name = "p"
-source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "7778bce878c77ae46159db3ec19c05d260e87409" }
+source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "899bd465462a536d89f8fb583dccdd70962eca51" }
 ```
 
 Then build the grammar and install its highlight queries. Helix doesn't
