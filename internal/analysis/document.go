@@ -7,7 +7,7 @@ import (
 	"unicode/utf16"
 	"unicode/utf8"
 
-	tree_sitter_p "github.com/bencornia/tree-sitter-p.git/bindings/go"
+	tree_sitter_p "github.com/bencornia/tree-sitter-p/bindings/go"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )

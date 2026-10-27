@@ -4,16 +4,29 @@ An lsp written for the [P programming language](https://github.com/p-org/P).
 
 ## Building
 
-The server uses a local checkout of [tree-sitter-p](https://github.com/bencornia/tree-sitter-p)
-via a `replace` directive in `go.mod`, so clone it next to this repo first:
-
 ```sh
-git clone https://github.com/bencornia/tree-sitter-p ../tree-sitter-p
 go build -o bin/p-lsp .
 go test ./...
 ```
 
 Building requires cgo (a C compiler), since tree-sitter is a C library.
+
+While the grammar's repository is private, Go has to fetch it directly over
+SSH rather than through the public module proxy:
+
+```sh
+go env -w 'GOPRIVATE=github.com/bencornia/*'
+git config --global url."git@github.com:".insteadOf "https://github.com/"
+```
+
+The grammar, [tree-sitter-p](https://github.com/bencornia/tree-sitter-p), is
+an ordinary Go dependency. To work on both at once, use a local checkout
+through a Go workspace, which `.gitignore` keeps out of commits:
+
+```sh
+git clone https://github.com/bencornia/tree-sitter-p ../tree-sitter-p
+go work init . ../tree-sitter-p
+```
 
 After regenerating the grammar, rebuild with `go build -a`. The Go binding
 `#include`s `parser.c` from outside its package, so a plain `go build` can
@@ -78,7 +91,7 @@ language-servers = ["p-lsp"]
 
 [[grammar]]
 name = "p"
-source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "837de5aecdf558402c195172412c887223e9bcb0" }
+source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "4a5fd7cded6278fb32ccfa206e7c90ad6f423136" }
 ```
 
 Then build the grammar and install its highlight queries. Helix doesn't
@@ -87,7 +100,7 @@ create the grammars directory itself:
 ```sh
 mkdir -p ~/.config/helix/runtime/grammars ~/.config/helix/runtime/queries/p
 hx --grammar fetch && hx --grammar build
-cp ~/.config/helix/runtime/grammars/sources/p/queries/highlights.scm ~/.config/helix/runtime/queries/p/
+cp ~/.config/helix/runtime/grammars/sources/p/queries/*.scm ~/.config/helix/runtime/queries/p/
 hx --health p
 ```
 
@@ -176,7 +189,7 @@ such as `["-compiler", ""]`.
 - [x] Add `scenario` declarations
 - [x] Fix `rhs` field on comparison and `in` expressions
 - [x] Start a `test/corpus`
-- [ ] Remove `.git` from the Go module path, so p-lsp can depend on it without a `replace`
-- [ ] Add `locals.scm` (definitions, references, scopes)
-- [ ] Add `tags.scm`
-- [ ] Grow `test/corpus` from the P repo's `Tst/` and `Tutorial/` programs
+- [x] Remove `.git` from the Go module path, so p-lsp can depend on it without a `replace`
+- [x] Add `locals.scm` (definitions, references, scopes)
+- [x] Add `tags.scm`
+- [x] Grow `test/corpus` from the P repo's `Tst/` and `Tutorial/` programs

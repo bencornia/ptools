@@ -3,7 +3,7 @@ module github.com/bencornia/p-lsp
 go 1.24.3
 
 require (
-	github.com/bencornia/tree-sitter-p.git v0.0.0
+	github.com/bencornia/tree-sitter-p v0.0.0-20261027180924-4a5fd7cded62
 	github.com/tliron/commonlog v0.2.8
 	github.com/tliron/glsp v0.2.2
 	github.com/tree-sitter/go-tree-sitter v0.25.0
@@ -29,5 +29,3 @@ require (
 	golang.org/x/sys v0.14.0 // indirect
 	golang.org/x/term v0.14.0 // indirect
 )
-
-replace github.com/bencornia/tree-sitter-p.git => ../tree-sitter-p
