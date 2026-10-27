@@ -70,6 +70,7 @@ func New(version string) *Server {
 		TextDocumentHover:              s.hover,
 		TextDocumentPrepareRename:      s.prepareRename,
 		TextDocumentRename:             s.rename,
+		WorkspaceSymbol:                s.workspaceSymbol,
 		WorkspaceDidChangeWatchedFiles: s.didChangeWatchedFiles,
 	}
 	return s
@@ -199,6 +200,16 @@ func (s *Server) hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol
 		return nil, nil
 	}
 	return analysis.Hover(s.visibleDocs(path), doc, params.Position), nil
+}
+
+// maxWorkspaceSymbols caps workspace symbol results; editors re-query as the
+// user types, so the best matches are what matter.
+const maxWorkspaceSymbols = 500
+
+func (s *Server) workspaceSymbol(_ *glsp.Context, params *protocol.WorkspaceSymbolParams) ([]protocol.SymbolInformation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return analysis.WorkspaceSymbols(s.allDocs(), params.Query, maxWorkspaceSymbols), nil
 }
 
 func (s *Server) prepareRename(_ *glsp.Context, params *protocol.PrepareRenameParams) (any, error) {
