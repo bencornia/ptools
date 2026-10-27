@@ -29,6 +29,7 @@ func TestParseOutput(t *testing.T) {
 		"[NotSupportedError:] /proj/App/PSrc/Client.p (line 9:3): \"forall\" keyword is only supported by PVerifier backend.\n" +
 		"[Error:] [<no source>:-1:-1] internal error\n" +
 		"[NotImplementedError:] something unsupported\n" +
+		"Error: At least one .p file must be provided as input files, no input files found after parsing the project file\n" +
 		"Code generation for PChecker...\n"
 
 	got := ParseOutput(output, dir, files)
@@ -41,6 +42,7 @@ func TestParseOutput(t *testing.T) {
 		{File: files[0], Line: 8, Column: 3, Message: "\"forall\" keyword is only supported by PVerifier backend."},
 		{Message: "internal error"},
 		{Message: "something unsupported"},
+		{Message: "At least one .p file must be provided as input files, no input files found after parsing the project file"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseOutput:\n got %+v\nwant %+v", got, want)
@@ -51,5 +53,35 @@ func TestParseOutputIgnoresInfo(t *testing.T) {
 	output := "Parsing ...\nType checking ...\nCode generation for PChecker...\nGenerated App.cs.\n"
 	if got := ParseOutput(output, "/proj", nil); len(got) != 0 {
 		t.Errorf("got %+v, want no errors", got)
+	}
+}
+
+// P before 3.1 (here, 3.0.4) puts the "[Error:]" on a line of its own.
+func TestParseOutputTwoLineErrors(t *testing.T) {
+	dir := filepath.FromSlash("/proj/App")
+	files := []string{filepath.FromSlash("/proj/App/PSrc/A.p")}
+	output := "----------------------------------------\n" +
+		"....... includes p file: /proj/App/PSrc/A.p\n" +
+		"----------------------------------------\n" +
+		"Parsing ...\n" +
+		"Type checking ...\n" +
+		"[Error:]\n" +
+		"[PSrc/A.p:4:13] got type: bool, expected: int\n" +
+		"[Parser Error:]\r\n" +
+		"[A.p] parse error: line 3:16 missing ';' at '}'\r\n" +
+		"\x1b[31m[Error:]\x1b[0m\n" +
+		"\n" +
+		"[../Common/C.p:1:27] got type: bool, expected: int\n" +
+		"[Error:]\n"
+
+	got := ParseOutput(output, dir, files)
+	want := []Error{
+		{File: files[0], Line: 3, Column: 12, Message: "got type: bool, expected: int"},
+		{File: files[0], Line: 2, Column: 16, Message: "parse error: missing ';' at '}'"},
+		{File: filepath.FromSlash("/proj/Common/C.p"), Line: 0, Column: 26, Message: "got type: bool, expected: int"},
+		{Message: "Error"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("got  %+v\nwant %+v", got, want)
 	}
 }

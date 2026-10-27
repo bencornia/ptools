@@ -33,6 +33,12 @@ var (
 	notSupported = regexp.MustCompile(`^\[NotSupportedError:\] (.+) \(line (\d+):(\d+)\): (.*)$`)
 	// Any other error, such as "[Error:] <no source>:-1:-1 message".
 	otherError = regexp.MustCompile(`^\[(?:[A-Za-z]+ )?(?:Error|NotSupportedError|NotImplementedError):\] (.*)$`)
+	// Before P 3.1, the "[Error:]" part was on a line of its own, and the
+	// rest of the error on the next line.
+	// Error: message, for errors in the project file, such as one that
+	// lists no .p files.
+	plainError = regexp.MustCompile(`^Error: (.+)$`)
+	errorHeading = regexp.MustCompile(`^\[(?:[A-Za-z]+ )?(?:Error|NotSupportedError|NotImplementedError):\]$`)
 )
 
 // ParseOutput extracts the errors from the compiler's output. dir is the
@@ -42,11 +48,26 @@ func ParseOutput(output, dir string, files []string) []Error {
 	var errors []Error
 	scanner := bufio.NewScanner(strings.NewReader(output))
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)
+	heading := ""
 	for scanner.Scan() {
-		line := stripANSI(strings.TrimRight(scanner.Text(), "\r"))
+		line := strings.TrimSpace(stripANSI(scanner.Text()))
+		switch {
+		case line == "":
+			continue
+		case errorHeading.MatchString(line):
+			heading = line
+			continue
+		case heading != "":
+			line = heading + " " + line
+			heading = ""
+		}
 		if e, ok := parseLine(line, dir, files); ok {
 			errors = append(errors, e)
 		}
+	}
+	if heading != "" {
+		// A heading with nothing after it.
+		errors = append(errors, Error{Message: strings.Trim(heading, "[]:")})
 	}
 	return errors
 }
@@ -75,6 +96,9 @@ func parseLine(line, dir string, files []string) (Error, bool) {
 		return Error{File: filepath.Clean(m[1]), Line: lineNo - 1, Column: col, Message: m[4]}, true
 	}
 	if m := otherError.FindStringSubmatch(line); m != nil {
+		return Error{Message: m[1]}, true
+	}
+	if m := plainError.FindStringSubmatch(line); m != nil {
 		return Error{Message: m[1]}, true
 	}
 	return Error{}, false
