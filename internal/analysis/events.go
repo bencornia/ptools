@@ -8,34 +8,31 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-// undefinedEventFixes finds events used but declared nowhere, and offers to
-// declare each, with a payload type guessed from how it's used.
-func undefinedEventFixes(workspace []*Document, doc *Document) []Fix {
-	fixes := []Fix{}
-	doc.walk(func(n *sitter.Node) bool {
-		event := eventReference(doc, n)
-		if event == nil || len(resolve(workspace, doc, event)) > 0 {
-			return true
+// undefinedEvent reports n if it's an event declared nowhere, and offers
+// to declare it, with a payload type guessed from how it's used, or to
+// change it to the closest events that are declared.
+func undefinedEvent(workspace []*Document, doc *Document, n *sitter.Node) []Fix {
+	event := eventReference(doc, n)
+	if event == nil || len(resolve(workspace, doc, event)) > 0 {
+		return nil
+	}
+	name := event.Utf8Text(doc.Text)
+	declaration := "event " + name + ";"
+	if payload, ok := payloadType(workspace, doc, event); ok {
+		declaration = fmt.Sprintf("event %s: %s;", name, payload)
+	}
+	diagnostic := nameDiagnostic(doc, event, fmt.Sprintf("undefined event `%s`", name))
+	fixes := []Fix{{
+		Diagnostic: diagnostic,
+		Title:      fmt.Sprintf("Declare `%s`", declaration),
+		Edits:      []protocol.TextEdit{declarationEdit(doc, declaration)},
+	}}
+	// Or it's a misspelling of one that exists.
+	for _, f := range renameFixes(doc, event, diagnostic, eventDeclarations(workspace)) {
+		if len(f.Edits) > 0 {
+			fixes = append(fixes, f)
 		}
-		name := event.Utf8Text(doc.Text)
-		declaration := "event " + name + ";"
-		if payload, ok := payloadType(workspace, doc, event); ok {
-			declaration = fmt.Sprintf("event %s: %s;", name, payload)
-		}
-		diagnostic := nameDiagnostic(doc, event, fmt.Sprintf("undefined event `%s`", name))
-		fixes = append(fixes, Fix{
-			Diagnostic: diagnostic,
-			Title:      fmt.Sprintf("Declare `%s`", declaration),
-			Edits:      []protocol.TextEdit{declarationEdit(doc, declaration)},
-		})
-		// Or it's a misspelling of one that exists.
-		for _, f := range renameFixes(doc, event, diagnostic, eventDeclarations(workspace)) {
-			if len(f.Edits) > 0 {
-				fixes = append(fixes, f)
-			}
-		}
-		return true
-	})
+	}
 	return fixes
 }
 

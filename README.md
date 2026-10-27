@@ -180,6 +180,7 @@ such as `["-compiler", ""]`.
 - [x] Quick fix: declare an undefined event, with its payload type taken from how it's handled or sent
 - [x] Quick fix: change a misspelled name to the closest name in scope (variables, functions, types, states, modules, fields, events)
 - [x] Signature help: a function's parameters, a machine's start parameter after `new`, or an event's payload type in `send`, `raise` and `announce`, while typing arguments
+- [x] Merge the full-tree passes behind diagnostics (tuple checks, undefined events and names, empty receives) into one walk, to speed up large files
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
 

@@ -48,26 +48,43 @@ func Fixes(workspace []*Document, doc *Document) []Fix {
 
 // semanticFixes finds the mistakes that parse but that the compiler would
 // reject. Some have no fix, only a diagnostic, and some have several fixes,
-// each with the same diagnostic.
+// each with the same diagnostic. The checks all run in one walk of the
+// tree, which on a large file is much of their cost.
 func semanticFixes(workspace []*Document, doc *Document) []Fix {
-	fixes := typeFixes(workspace, doc)
-	fixes = append(fixes, undefinedEventFixes(workspace, doc)...)
-	fixes = append(fixes, undefinedNameFixes(workspace, doc)...)
-	return append(fixes, emptyReceives(doc)...)
-}
-
-// emptyReceives reports `receive` statements with no cases, which P
-// rejects. The grammar allows them so that editors can indent the first
-// case as it's typed.
-func emptyReceives(doc *Document) []Fix {
-	problems := []Fix{}
+	fixes := []Fix{}
 	doc.walk(func(n *sitter.Node) bool {
-		if n.Kind() == "receive_statement" && firstChildOfKind(n, "recv_case") == nil {
-			problems = append(problems, Fix{Diagnostic: syntaxDiagnostic(doc.Range(n.Child(0)), "`receive` needs at least one `case`")})
+		switch n.Kind() {
+		case "ERROR":
+			// Already reported as a syntax error.
+			return false
+		case "paren_expression":
+			if f, ok := parenthesizedNotTuple(workspace, doc, n); ok {
+				fixes = append(fixes, f)
+			}
+		case "receive_statement":
+			if f, ok := emptyReceive(doc, n); ok {
+				fixes = append(fixes, f)
+			}
+		case "identifier":
+			if eventReference(doc, n) != nil {
+				fixes = append(fixes, undefinedEvent(workspace, doc, n)...)
+			} else {
+				fixes = append(fixes, undefinedName(workspace, doc, n)...)
+			}
 		}
 		return true
 	})
-	return problems
+	return fixes
+}
+
+// emptyReceive reports a `receive` statement with no cases, which P
+// rejects. The grammar allows it so that editors can indent the first case
+// as it's typed.
+func emptyReceive(doc *Document, receive *sitter.Node) (Fix, bool) {
+	if firstChildOfKind(receive, "recv_case") != nil {
+		return Fix{}, false
+	}
+	return Fix{Diagnostic: syntaxDiagnostic(doc.Range(receive.Child(0)), "`receive` needs at least one `case`")}, true
 }
 
 // isMissingTupleComma reports whether n is the comma tree-sitter expected
@@ -85,22 +102,9 @@ func missingTupleCommaMessage(doc *Document, body *sitter.Node) string {
 	return message
 }
 
-// typeFixes finds values in parentheses, like `(1)`, where a one-element
-// tuple is expected: P reads them as the value itself, not a tuple.
-func typeFixes(workspace []*Document, doc *Document) []Fix {
-	fixes := []Fix{}
-	doc.walk(func(n *sitter.Node) bool {
-		if n.Kind() != "paren_expression" {
-			return true
-		}
-		if f, ok := parenthesizedNotTuple(workspace, doc, n); ok {
-			fixes = append(fixes, f)
-		}
-		return true
-	})
-	return fixes
-}
-
+// parenthesizedNotTuple reports a value in parentheses, like `(1)`, where
+// a one-element tuple is expected: P reads it as the value itself, not a
+// tuple.
 func parenthesizedNotTuple(workspace []*Document, doc *Document, paren *sitter.Node) (Fix, bool) {
 	inner := paren.NamedChild(0)
 	if inner == nil || !isNotTuple(workspace, doc, inner) {

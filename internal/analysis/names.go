@@ -12,50 +12,37 @@ import (
 // maxSuggestions is how many names a misspelled name is offered as fixes.
 const maxSuggestions = 3
 
-// undefinedNameFixes finds names that refer to nothing: variables,
-// functions, types, machines, states, modules, and the fields of named
-// tuples. Each comes with fixes that change it to the closest names that
-// would fit. Events are left to undefinedEventFixes, which can also
-// declare them.
-func undefinedNameFixes(workspace []*Document, doc *Document) []Fix {
-	fixes := []Fix{}
-	doc.walk(func(n *sitter.Node) bool {
-		if n.IsError() {
-			// Already reported as a syntax error.
-			return false
+// undefinedName reports the identifier n if it refers to nothing: a
+// variable, function, type, machine, state, module, or field of a named
+// tuple. Its fixes change it to the closest names that would fit. Events
+// are left to undefinedEvent, which can also declare them.
+func undefinedName(workspace []*Document, doc *Document, n *sitter.Node) []Fix {
+	name := n.Utf8Text(doc.Text)
+	var message string
+	var candidates []declaration
+	if isFieldName(doc, n) {
+		fields, typeName, ok := knownFields(workspace, doc, n)
+		if !ok || len(named(fields, name)) > 0 {
+			return nil
 		}
-		if n.Kind() != "identifier" || eventReference(doc, n) != nil {
-			return true
+		message = fmt.Sprintf("no field `%s` in `%s`", name, typeName)
+		candidates = fields
+	} else {
+		// A declared name resolves to itself.
+		if len(resolve(workspace, doc, n)) > 0 {
+			return nil
 		}
-		name := n.Utf8Text(doc.Text)
-		var message string
-		var candidates []declaration
-		if isFieldName(doc, n) {
-			fields, typeName, ok := knownFields(workspace, doc, n)
-			if !ok || len(named(fields, name)) > 0 {
-				return true
-			}
-			message = fmt.Sprintf("no field `%s` in `%s`", name, typeName)
-			candidates = fields
-		} else {
-			// A declared name resolves to itself.
-			if len(resolve(workspace, doc, n)) > 0 {
-				return true
-			}
-			kind := "name"
-			switch namespaceOf(doc, n) {
-			case nsState:
-				kind = "state"
-			case nsModule:
-				kind = "module"
-			}
-			message = fmt.Sprintf("undefined %s `%s`", kind, name)
-			candidates = fitting(doc, n, namesInScope(workspace, doc, n))
+		kind := "name"
+		switch namespaceOf(doc, n) {
+		case nsState:
+			kind = "state"
+		case nsModule:
+			kind = "module"
 		}
-		fixes = append(fixes, renameFixes(doc, n, nameDiagnostic(doc, n, message), candidates)...)
-		return true
-	})
-	return fixes
+		message = fmt.Sprintf("undefined %s `%s`", kind, name)
+		candidates = fitting(doc, n, namesInScope(workspace, doc, n))
+	}
+	return renameFixes(doc, n, nameDiagnostic(doc, n, message), candidates)
 }
 
 // Declaration kinds that fit where a type, a function, or a machine to

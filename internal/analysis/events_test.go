@@ -3,7 +3,19 @@ package analysis
 import (
 	"strings"
 	"testing"
+
+	sitter "github.com/tree-sitter/go-tree-sitter"
 )
+
+// undefinedEventFixes returns the fixes undefinedEvent offers in doc.
+func undefinedEventFixes(workspace []*Document, doc *Document) []Fix {
+	fixes := []Fix{}
+	doc.walk(func(n *sitter.Node) bool {
+		fixes = append(fixes, undefinedEvent(workspace, doc, n)...)
+		return true
+	})
+	return fixes
+}
 
 func TestUndefinedEventFixes(t *testing.T) {
 	const machine = `machine M {
