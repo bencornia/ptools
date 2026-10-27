@@ -31,7 +31,9 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 - [x] Syntax error diagnostics
 - [x] Document outline (`textDocument/documentSymbol`)
 - [x] Go to definition, across all `.p` files in the workspace
-- [ ] Read `.pproj` files: follow `<IncludeProject>` and only index listed `<PFile>` paths
+- [x] Read `.pproj` files: follow `<IncludeProject>` and only index listed `<PFile>` paths
+- [ ] Reload `.pproj` files and newly created `.p` files when they change on disk
+- [ ] Find a file's `.pproj` by searching parent directories when it's opened outside the workspace
 - [ ] Go to definition for tuple fields (needs types)
 - [ ] Find references
 - [ ] Hover (show a symbol's declaration)

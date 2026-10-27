@@ -2,9 +2,12 @@
 package server
 
 import (
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/bencornia/p-lsp/internal/project"
 	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -24,19 +27,21 @@ type Server struct {
 	// time, but nothing in its API promises that.
 	mu     sync.Mutex
 	parser *sitter.Parser
-	// docs holds every P file in the workspace, keyed by path (see key).
-	// Files open in the editor use the editor's text; the rest are read
-	// from disk.
-	docs map[string]*analysis.Document
-	open map[string]bool
+	// docs holds every P file in the workspace and in the projects it
+	// includes, keyed by path (see key). Files open in the editor use the
+	// editor's text; the rest are read from disk.
+	docs     map[string]*analysis.Document
+	open     map[string]bool
+	projects *project.Index
 }
 
 func New(version string) *Server {
 	s := &Server{
-		version: version,
-		parser:  analysis.NewParser(),
-		docs:    map[string]*analysis.Document{},
-		open:    map[string]bool{},
+		version:  version,
+		parser:   analysis.NewParser(),
+		docs:     map[string]*analysis.Document{},
+		open:     map[string]bool{},
+		projects: project.NewIndex(),
 	}
 	s.handler = protocol.Handler{
 		Initialize:                 s.initialize,
@@ -81,20 +86,32 @@ func (s *Server) initialize(_ *glsp.Context, params *protocol.InitializeParams) 
 	}, nil
 }
 
-// loadWorkspace parses every P file under roots so that definitions in files
-// the editor hasn't opened can be found.
+// loadWorkspace parses every P file under roots, and every file in the
+// projects they include, so that definitions in files the editor hasn't
+// opened can be found.
 func (s *Server) loadWorkspace(roots []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for _, root := range roots {
-		paths, err := findPFiles(root)
+		pFiles, projects, err := project.Find(root)
 		if err != nil {
 			log.Errorf("loading workspace %s: %s", root, err)
 		}
-		for _, path := range paths {
+		s.projects.Load(projects...)
+		for _, path := range pFiles {
 			s.loadFromDisk(path)
 		}
-		log.Infof("loaded %d P files from %s", len(paths), root)
+		log.Infof("loaded %d P files and %d projects from %s", len(pFiles), len(projects), root)
+	}
+	// Included projects can live outside the workspace, as with the P
+	// tutorials' ../Common/Timer.
+	for _, path := range s.projects.Files() {
+		if _, loaded := s.docs[path]; !loaded {
+			s.loadFromDisk(path)
+		}
+	}
+	for path, err := range s.projects.Errors {
+		log.Errorf("reading project %s: %s", path, err)
 	}
 }
 
@@ -159,14 +176,12 @@ func (s *Server) documentSymbol(_ *glsp.Context, params *protocol.DocumentSymbol
 func (s *Server) definition(_ *glsp.Context, params *protocol.DefinitionParams) (any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	doc, ok := s.docs[key(params.TextDocument.URI)]
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
 	if !ok {
 		return nil, nil
 	}
-	workspace := make([]*analysis.Document, 0, len(s.docs))
-	for _, d := range s.docs {
-		workspace = append(workspace, d)
-	}
+	workspace := s.visibleDocs(path)
 	return analysis.Definition(workspace, doc, params.Position), nil
 }
 
@@ -187,6 +202,25 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 		Version:     &publishedVersion,
 		Diagnostics: diagnostics,
 	})
+}
+
+// visibleDocs returns the documents compiled together with the one at path,
+// sorted by path: its projects' files, or every document if no project lists
+// it. Callers must hold mu.
+func (s *Server) visibleDocs(path string) []*analysis.Document {
+	paths, ok := s.projects.Visible(path)
+	if !ok {
+		paths = slices.Collect(maps.Keys(s.docs))
+	}
+	slices.Sort(paths)
+
+	docs := make([]*analysis.Document, 0, len(paths))
+	for _, p := range paths {
+		if doc, ok := s.docs[p]; ok {
+			docs = append(docs, doc)
+		}
+	}
+	return docs
 }
 
 // loadFromDisk parses the file at path, unless the editor has it open. It
