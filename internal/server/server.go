@@ -77,6 +77,8 @@ func New(version string) *Server {
 		TextDocumentReferences:          s.references,
 		TextDocumentHover:               s.hover,
 		TextDocumentCompletion:          s.completion,
+		TextDocumentFoldingRange:        s.foldingRange,
+		TextDocumentSelectionRange:      s.selectionRange,
 		TextDocumentSemanticTokensFull:  s.semanticTokensFull,
 		TextDocumentSemanticTokensRange: s.semanticTokensRange,
 		TextDocumentPrepareRename:       s.prepareRename,
@@ -195,6 +197,26 @@ func (s *Server) documentSymbol(_ *glsp.Context, params *protocol.DocumentSymbol
 		return nil, nil
 	}
 	return analysis.Symbols(doc), nil
+}
+
+func (s *Server) foldingRange(_ *glsp.Context, params *protocol.FoldingRangeParams) ([]protocol.FoldingRange, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, ok := s.docs[key(params.TextDocument.URI)]
+	if !ok {
+		return nil, nil
+	}
+	return analysis.FoldingRanges(doc), nil
+}
+
+func (s *Server) selectionRange(_ *glsp.Context, params *protocol.SelectionRangeParams) ([]protocol.SelectionRange, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, ok := s.docs[key(params.TextDocument.URI)]
+	if !ok {
+		return nil, nil
+	}
+	return analysis.SelectionRanges(doc, params.Positions), nil
 }
 
 func (s *Server) definition(_ *glsp.Context, params *protocol.DefinitionParams) (any, error) {

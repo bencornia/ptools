@@ -65,7 +65,7 @@ newer compilers report them all at once.
 - [x] Verify type-check diagnostics against the real P compiler (P 3.1.0)
 - [x] Completion: names in scope, fields after `.`, states after `goto`, and keywords
 - [x] Semantic tokens: names colored by what they refer to, plus keywords, comments, strings and numbers
-- [ ] Folding and selection ranges
+- [x] Folding (braces and comments) and selection ranges (expand selection by syntax node)
 - [ ] Tests for `internal/server`
 - [ ] Editor setup instructions (VS Code, Neovim)
 
