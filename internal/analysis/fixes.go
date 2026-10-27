@@ -18,8 +18,18 @@ type Fix struct {
 // through types that the compiler would otherwise only report on save.
 func Diagnostics(workspace []*Document, doc *Document) []protocol.Diagnostic {
 	diagnostics := SyntaxDiagnostics(doc)
+	// A problem with several fixes comes once for each.
+	seen := map[protocol.Range]map[string]bool{}
 	for _, f := range semanticFixes(workspace, doc) {
-		diagnostics = append(diagnostics, f.Diagnostic)
+		d := f.Diagnostic
+		if seen[d.Range][d.Message] {
+			continue
+		}
+		if seen[d.Range] == nil {
+			seen[d.Range] = map[string]bool{}
+		}
+		seen[d.Range][d.Message] = true
+		diagnostics = append(diagnostics, d)
 	}
 	return diagnostics
 }
@@ -27,13 +37,22 @@ func Diagnostics(workspace []*Document, doc *Document) []protocol.Diagnostic {
 // Fixes returns the problems in doc that can be fixed automatically. Each
 // one's diagnostic is also among Diagnostics.
 func Fixes(workspace []*Document, doc *Document) []Fix {
-	return append(syntaxFixes(doc), semanticFixes(workspace, doc)...)
+	fixes := syntaxFixes(doc)
+	for _, f := range semanticFixes(workspace, doc) {
+		if len(f.Edits) > 0 {
+			fixes = append(fixes, f)
+		}
+	}
+	return fixes
 }
 
 // semanticFixes finds the mistakes that parse but that the compiler would
-// reject.
+// reject. Some have no fix, only a diagnostic, and some have several fixes,
+// each with the same diagnostic.
 func semanticFixes(workspace []*Document, doc *Document) []Fix {
-	return append(typeFixes(workspace, doc), undefinedEventFixes(workspace, doc)...)
+	fixes := typeFixes(workspace, doc)
+	fixes = append(fixes, undefinedEventFixes(workspace, doc)...)
+	return append(fixes, undefinedNameFixes(workspace, doc)...)
 }
 
 // isMissingTupleComma reports whether n is the comma tree-sitter expected

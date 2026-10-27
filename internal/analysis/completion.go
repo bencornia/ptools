@@ -66,17 +66,8 @@ func Completion(parser *sitter.Parser, workspace []*Document, doc *Document, pos
 			decls = fieldsOf(workspace, t)
 		}
 	default:
-		ns := namespaceOf(ident)
-		for scope := parent; scope != nil; scope = scope.Parent() {
-			decls = append(decls, edited.scopeDeclarations(scope, ns)...)
-		}
-		if ns != nsState {
-			decls = append(decls, globalDeclarationsIn(workspace, ns)...)
-		}
-		if isTestedKind(ident) {
-			decls = append(decls, testedStates(workspace, edited, parent)...)
-		}
-		keywordsToo = ns == nsValue
+		decls = namesInScope(workspace, edited, ident)
+		keywordsToo = namespaceOf(ident) == nsValue
 	}
 
 	items := []protocol.CompletionItem{}
@@ -116,6 +107,23 @@ func prevToken(node *sitter.Node) string {
 		return prev.Kind()
 	}
 	return ""
+}
+
+// namesInScope returns the declarations the name ident could refer to, in
+// its namespace, innermost first.
+func namesInScope(workspace []*Document, doc *Document, ident *sitter.Node) []declaration {
+	ns := namespaceOf(ident)
+	decls := []declaration{}
+	for scope := ident.Parent(); scope != nil; scope = scope.Parent() {
+		decls = append(decls, doc.scopeDeclarations(scope, ns)...)
+	}
+	if ns != nsState {
+		decls = append(decls, globalDeclarationsIn(workspace, ns)...)
+	}
+	if isTestedKind(ident) {
+		decls = append(decls, testedStates(workspace, doc, ident.Parent())...)
+	}
+	return decls
 }
 
 // isDeclaredName reports whether ident is the name in a declaration.

@@ -92,7 +92,7 @@ func TestMissingTokenFixes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			doc := parse(t, tt.text)
-			fixes := Fixes([]*Document{doc}, doc)
+			fixes := syntaxFixes(doc)
 			if len(fixes) != 1 {
 				t.Fatalf("got %d fixes, want 1; diagnostics %+v", len(fixes), SyntaxDiagnostics(doc))
 			}
@@ -114,7 +114,7 @@ func TestMissingTokenFixes(t *testing.T) {
 func TestUnclearSyntaxErrorsHaveNoFix(t *testing.T) {
 	// A stray token: inserting a `;` wouldn't help.
 	doc := parse(t, "event eFoo;\n@ event eBar;\n")
-	if fixes := Fixes([]*Document{doc}, doc); len(fixes) != 0 {
+	if fixes := syntaxFixes(doc); len(fixes) != 0 {
 		t.Errorf("got fix %+v", fixes[0])
 	}
 	if diags := SyntaxDiagnostics(doc); len(diags) == 0 {

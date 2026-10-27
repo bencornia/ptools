@@ -22,21 +22,32 @@ func undefinedEventFixes(workspace []*Document, doc *Document) []Fix {
 		if payload, ok := payloadType(workspace, doc, event); ok {
 			declaration = fmt.Sprintf("event %s: %s;", name, payload)
 		}
-		severity := protocol.DiagnosticSeverityError
-		source := diagnosticSource
+		diagnostic := nameDiagnostic(doc, event, fmt.Sprintf("undefined event `%s`", name))
 		fixes = append(fixes, Fix{
-			Diagnostic: protocol.Diagnostic{
-				Range:    doc.Range(event),
-				Severity: &severity,
-				Source:   &source,
-				Message:  fmt.Sprintf("undefined event `%s`", name),
-			},
-			Title: fmt.Sprintf("Declare `%s`", declaration),
-			Edits: []protocol.TextEdit{declarationEdit(doc, declaration)},
+			Diagnostic: diagnostic,
+			Title:      fmt.Sprintf("Declare `%s`", declaration),
+			Edits:      []protocol.TextEdit{declarationEdit(doc, declaration)},
 		})
+		// Or it's a misspelling of one that exists.
+		for _, f := range renameFixes(doc, event, diagnostic, eventDeclarations(workspace)) {
+			if len(f.Edits) > 0 {
+				fixes = append(fixes, f)
+			}
+		}
 		return true
 	})
 	return fixes
+}
+
+// eventDeclarations returns the events and event sets declared in workspace.
+func eventDeclarations(workspace []*Document) []declaration {
+	events := []declaration{}
+	for _, d := range globalDeclarationsIn(workspace, nsValue) {
+		if kind := d.node.Parent().Kind(); kind == "event_declaration" || kind == "event_set_declaration" {
+			events = append(events, d)
+		}
+	}
+	return events
 }
 
 // eventReference returns the event name n is, if n is an identifier where an
