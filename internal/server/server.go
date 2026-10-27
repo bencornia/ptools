@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	glspserver "github.com/tliron/glsp/server"
@@ -13,22 +14,29 @@ import (
 
 const name = "p-lsp"
 
+var log = commonlog.GetLogger(name)
+
 type Server struct {
 	version string
 	handler protocol.Handler
 
-	// mu guards parser and docs. glsp currently handles messages one at a
+	// mu guards everything below. glsp currently handles messages one at a
 	// time, but nothing in its API promises that.
 	mu     sync.Mutex
 	parser *sitter.Parser
-	docs   map[protocol.DocumentUri]*analysis.Document
+	// docs holds every P file in the workspace, keyed by path (see key).
+	// Files open in the editor use the editor's text; the rest are read
+	// from disk.
+	docs map[string]*analysis.Document
+	open map[string]bool
 }
 
 func New(version string) *Server {
 	s := &Server{
 		version: version,
 		parser:  analysis.NewParser(),
-		docs:    map[protocol.DocumentUri]*analysis.Document{},
+		docs:    map[string]*analysis.Document{},
+		open:    map[string]bool{},
 	}
 	s.handler = protocol.Handler{
 		Initialize:                 s.initialize,
@@ -37,6 +45,7 @@ func New(version string) *Server {
 		TextDocumentDidChange:      s.didChange,
 		TextDocumentDidClose:       s.didClose,
 		TextDocumentDocumentSymbol: s.documentSymbol,
+		TextDocumentDefinition:     s.definition,
 	}
 	return s
 }
@@ -46,7 +55,16 @@ func (s *Server) RunStdio() error {
 	return glspserver.NewServer(&s.handler, name, false).RunStdio()
 }
 
-func (s *Server) initialize(_ *glsp.Context, _ *protocol.InitializeParams) (any, error) {
+func (s *Server) initialize(_ *glsp.Context, params *protocol.InitializeParams) (any, error) {
+	var roots []string
+	for _, folder := range params.WorkspaceFolders {
+		roots = append(roots, uriToPath(folder.URI))
+	}
+	if len(roots) == 0 && params.RootURI != nil {
+		roots = append(roots, uriToPath(*params.RootURI))
+	}
+	s.loadWorkspace(roots)
+
 	capabilities := s.handler.CreateServerCapabilities()
 
 	// Re-parsing a whole P file takes well under a millisecond, so ask for
@@ -63,12 +81,29 @@ func (s *Server) initialize(_ *glsp.Context, _ *protocol.InitializeParams) (any,
 	}, nil
 }
 
+// loadWorkspace parses every P file under roots so that definitions in files
+// the editor hasn't opened can be found.
+func (s *Server) loadWorkspace(roots []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, root := range roots {
+		paths, err := findPFiles(root)
+		if err != nil {
+			log.Errorf("loading workspace %s: %s", root, err)
+		}
+		for _, path := range paths {
+			s.loadFromDisk(path)
+		}
+		log.Infof("loaded %d P files from %s", len(paths), root)
+	}
+}
+
 func (s *Server) shutdown(_ *glsp.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for uri, doc := range s.docs {
+	for path, doc := range s.docs {
 		doc.Close()
-		delete(s.docs, uri)
+		delete(s.docs, path)
 	}
 	return nil
 }
@@ -92,11 +127,14 @@ func (s *Server) didChange(ctx *glsp.Context, params *protocol.DidChangeTextDocu
 
 func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocumentParams) error {
 	uri := params.TextDocument.URI
+	path := key(uri)
 
 	s.mu.Lock()
-	if doc, ok := s.docs[uri]; ok {
-		doc.Close()
-		delete(s.docs, uri)
+	delete(s.open, path)
+	// The editor may have discarded unsaved changes, so go back to what's on
+	// disk. If the file is gone (or was never saved), forget it.
+	if !s.loadFromDisk(path) {
+		s.remove(path)
 	}
 	s.mu.Unlock()
 
@@ -111,22 +149,36 @@ func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocume
 func (s *Server) documentSymbol(_ *glsp.Context, params *protocol.DocumentSymbolParams) (any, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	doc, ok := s.docs[params.TextDocument.URI]
+	doc, ok := s.docs[key(params.TextDocument.URI)]
 	if !ok {
 		return nil, nil
 	}
 	return analysis.Symbols(doc), nil
 }
 
-// update re-parses a document and publishes its diagnostics.
+func (s *Server) definition(_ *glsp.Context, params *protocol.DefinitionParams) (any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, ok := s.docs[key(params.TextDocument.URI)]
+	if !ok {
+		return nil, nil
+	}
+	workspace := make([]*analysis.Document, 0, len(s.docs))
+	for _, d := range s.docs {
+		workspace = append(workspace, d)
+	}
+	return analysis.Definition(workspace, doc, params.Position), nil
+}
+
+// update re-parses an open document and publishes its diagnostics.
 func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version protocol.Integer, text string) {
 	publishedVersion := protocol.UInteger(version)
+	path := key(uri)
+
 	s.mu.Lock()
 	doc := analysis.Parse(s.parser, uri, version, text)
-	if old, ok := s.docs[uri]; ok {
-		old.Close()
-	}
-	s.docs[uri] = doc
+	s.replace(path, doc)
+	s.open[path] = true
 	diagnostics := analysis.SyntaxDiagnostics(doc)
 	s.mu.Unlock()
 
@@ -135,4 +187,33 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 		Version:     &publishedVersion,
 		Diagnostics: diagnostics,
 	})
+}
+
+// loadFromDisk parses the file at path, unless the editor has it open. It
+// reports whether the file is now loaded. Callers must hold mu.
+func (s *Server) loadFromDisk(path string) bool {
+	if s.open[path] {
+		return true
+	}
+	text, err := readFile(path)
+	if err != nil {
+		return false
+	}
+	s.replace(path, analysis.Parse(s.parser, pathToURI(path), 0, text))
+	return true
+}
+
+// replace stores doc under path, freeing any document it replaces. Callers
+// must hold mu.
+func (s *Server) replace(path string, doc *analysis.Document) {
+	s.remove(path)
+	s.docs[path] = doc
+}
+
+// remove forgets the document at path. Callers must hold mu.
+func (s *Server) remove(path string) {
+	if old, ok := s.docs[path]; ok {
+		old.Close()
+		delete(s.docs, path)
+	}
 }

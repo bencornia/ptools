@@ -76,6 +76,25 @@ func (d *Document) Position(p sitter.Point) protocol.Position {
 	return protocol.Position{Line: protocol.UInteger(row), Character: protocol.UInteger(col)}
 }
 
+// Point converts an LSP position (line, UTF-16 column) to a tree-sitter point
+// (row, byte column). Positions past the end of a line clamp to its end.
+func (d *Document) Point(pos protocol.Position) sitter.Point {
+	row := min(int(pos.Line), len(d.lineStarts)-1)
+	start := d.lineStarts[row]
+	end := len(d.Text)
+	if row+1 < len(d.lineStarts) {
+		end = d.lineStarts[row+1] - 1 // the '\n'
+	}
+
+	offset, units := start, 0
+	for offset < end && units < int(pos.Character) {
+		r, size := utf8.DecodeRune(d.Text[offset:end])
+		units += max(utf16.RuneLen(r), 1)
+		offset += size
+	}
+	return sitter.Point{Row: uint(row), Column: uint(offset - start)}
+}
+
 // Range returns the LSP range covered by a node.
 func (d *Document) Range(n *sitter.Node) protocol.Range {
 	return protocol.Range{
