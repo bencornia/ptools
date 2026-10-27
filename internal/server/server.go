@@ -35,17 +35,23 @@ type Server struct {
 	projects *project.Index
 	// roots are the workspace folders.
 	roots []string
-	// watchFiles is whether the client can watch files for us.
-	watchFiles bool
+	// watch describes what the client can watch for us.
+	watch watchSupport
+	// watchers are the file watchers last sent to registerWatchers.
+	watchers []fileSystemWatcher
+	// pendingWatchers holds the latest watchers for registerWatchers to
+	// register; see queueWatchers.
+	pendingWatchers chan []fileSystemWatcher
 }
 
 func New(version string) *Server {
 	s := &Server{
-		version:  version,
-		parser:   analysis.NewParser(),
-		docs:     map[string]*analysis.Document{},
-		open:     map[string]bool{},
-		projects: project.NewIndex(),
+		version:         version,
+		parser:          analysis.NewParser(),
+		docs:            map[string]*analysis.Document{},
+		open:            map[string]bool{},
+		projects:        project.NewIndex(),
+		pendingWatchers: make(chan []fileSystemWatcher, 1),
 	}
 	s.handler = protocol.Handler{
 		Initialize:                     s.initialize,
@@ -66,7 +72,7 @@ func (s *Server) RunStdio() error {
 	return glspserver.NewServer(&s.handler, name, false).RunStdio()
 }
 
-func (s *Server) initialize(_ *glsp.Context, params *protocol.InitializeParams) (any, error) {
+func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams) (any, error) {
 	var roots []string
 	for _, folder := range params.WorkspaceFolders {
 		roots = append(roots, uriToPath(folder.URI))
@@ -74,13 +80,10 @@ func (s *Server) initialize(_ *glsp.Context, params *protocol.InitializeParams) 
 	if len(roots) == 0 && params.RootURI != nil {
 		roots = append(roots, uriToPath(*params.RootURI))
 	}
-	workspace := params.Capabilities.Workspace
-	watchFiles := workspace != nil && workspace.DidChangeWatchedFiles != nil &&
-		workspace.DidChangeWatchedFiles.DynamicRegistration != nil && *workspace.DidChangeWatchedFiles.DynamicRegistration
 
 	s.mu.Lock()
 	s.roots = roots
-	s.watchFiles = watchFiles
+	s.watch = parseWatchSupport(ctx.Params)
 	s.reloadWorkspace()
 	s.mu.Unlock()
 

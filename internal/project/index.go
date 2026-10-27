@@ -39,6 +39,16 @@ func (x *Index) Load(paths ...string) {
 	}
 }
 
+// Projects returns the paths of every loaded .pproj file, sorted.
+func (x *Index) Projects() []string {
+	paths := make([]string, 0, len(x.projects))
+	for path := range x.projects {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
 // Files returns every .p file in every loaded project, sorted.
 func (x *Index) Files() []string {
 	files := make([]string, 0, len(x.owners))

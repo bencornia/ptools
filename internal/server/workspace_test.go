@@ -224,6 +224,66 @@ func TestRegistersFileWatchers(t *testing.T) {
 	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj")
 }
 
+// The P tutorials' layout: the workspace is App, which includes a project
+// from ../Common.
+var tutorialFiles = map[string]string{
+	"App/App.pproj": `<Project><InputFiles><PFile>./PSrc/</PFile></InputFiles>` +
+		`<IncludeProject>../Common/Timer/Timer.pproj</IncludeProject></Project>`,
+	"App/PSrc/Main.p":           "machine M {\n  start state S {\n    on eTimeOut do {}\n  }\n}\n",
+	"Common/Timer/Timer.pproj":  appProject,
+	"Common/Timer/PSrc/Timer.p": "event eTimeOut;\n",
+}
+
+func TestWatchesIncludedProjectsOutsideWorkspace(t *testing.T) {
+	s, root := start(t, tutorialFiles, client{watch: true, relative: true, workspace: "App"})
+	calls := make(chan call, 2)
+	if err := s.initialized(fakeContext(calls), &protocol.InitializedParams{}); err != nil {
+		t.Fatal(err)
+	}
+	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root),
+		"**/*.p", "**/*.pproj", "Common/Timer/**/*.p", "Common/Timer/**/*.pproj")
+
+	// A change reported in the external project is picked up.
+	write(t, root, "Common/Timer/PSrc/Timer.p", "\nevent eTimeOut;\n")
+	notify(t, s, root, map[string]protocol.UInteger{"Common/Timer/PSrc/Timer.p": protocol.FileChangeTypeChanged})
+	assertDefinitions(t, definitionOf(t, s, root, "App/PSrc/Main.p", "eTimeOut"), "Common/Timer/PSrc/Timer.p:2")
+
+	// Dropping the include replaces the watchers with ones that leave
+	// Common/Timer out.
+	write(t, root, "App/App.pproj", appProject)
+	notify(t, s, root, map[string]protocol.UInteger{"App/App.pproj": protocol.FileChangeTypeChanged})
+	if c := nextCall(t, calls); c.method != "client/unregisterCapability" {
+		t.Fatalf("got %s, want client/unregisterCapability", c.method)
+	}
+	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj")
+}
+
+func TestNoExternalWatchersWithoutRelativePatterns(t *testing.T) {
+	s, root := start(t, tutorialFiles, client{watch: true, workspace: "App"})
+	calls := make(chan call, 1)
+	if err := s.initialized(fakeContext(calls), &protocol.InitializedParams{}); err != nil {
+		t.Fatal(err)
+	}
+	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj")
+}
+
+func TestUnchangedWatchersAreNotReregistered(t *testing.T) {
+	s, root := start(t, tutorialFiles, client{watch: true, relative: true, workspace: "App"})
+	calls := make(chan call, 2)
+	if err := s.initialized(fakeContext(calls), &protocol.InitializedParams{}); err != nil {
+		t.Fatal(err)
+	}
+	nextCall(t, calls)
+
+	write(t, root, "App/PSrc/Events.p", "event eOther;\n")
+	notify(t, s, root, map[string]protocol.UInteger{"App/PSrc/Events.p": protocol.FileChangeTypeCreated})
+	select {
+	case c := <-calls:
+		t.Errorf("unexpected request to client: %s", c.method)
+	case <-time.After(50 * time.Millisecond):
+	}
+}
+
 func TestNoWatchersWithoutClientSupport(t *testing.T) {
 	s, _ := start(t, nil, client{})
 	calls := make(chan call, 1)

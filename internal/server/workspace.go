@@ -9,33 +9,6 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-// initialized asks the client to tell us when P files or projects change on
-// disk, so the workspace stays current without a restart.
-func (s *Server) initialized(ctx *glsp.Context, _ *protocol.InitializedParams) error {
-	s.mu.Lock()
-	watchFiles := s.watchFiles
-	s.mu.Unlock()
-	if !watchFiles {
-		log.Infof("client can't watch files; restart the server to pick up new files and .pproj changes")
-		return nil
-	}
-
-	params := protocol.RegistrationParams{Registrations: []protocol.Registration{{
-		ID:     "p-files",
-		Method: string(protocol.MethodWorkspaceDidChangeWatchedFiles),
-		RegisterOptions: protocol.DidChangeWatchedFilesRegistrationOptions{
-			Watchers: []protocol.FileSystemWatcher{
-				{GlobPattern: "**/*.p"},
-				{GlobPattern: "**/*.pproj"},
-			},
-		},
-	}}}
-	// glsp handles one message at a time, so waiting here for the client's
-	// reply would deadlock.
-	go ctx.Call(string(protocol.ServerClientRegisterCapability), params, nil)
-	return nil
-}
-
 func (s *Server) didChangeWatchedFiles(_ *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -102,4 +75,8 @@ func (s *Server) reloadWorkspace() {
 		}
 	}
 	log.Infof("workspace has %d P files", len(s.docs))
+
+	// The projects may now include different directories outside the
+	// workspace.
+	s.updateWatchers()
 }

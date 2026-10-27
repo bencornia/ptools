@@ -96,6 +96,10 @@ func TestVisible(t *testing.T) {
 	if _, ok := x.Errors[filepath.Join(root, "Common/Missing/Missing.pproj")]; !ok || len(x.Errors) != 1 {
 		t.Errorf("Errors = %v, want only the missing include", x.Errors)
 	}
+	wantProjects := paths(root, "App/App.pproj", "Common/Cycle/Cycle.pproj", "Common/Timer/Timer.pproj", "Common/Unrelated/Unrelated.pproj")
+	if got := x.Projects(); !reflect.DeepEqual(got, wantProjects) {
+		t.Errorf("Projects = %v\nwant %v", got, wantProjects)
+	}
 
 	tests := []struct {
 		file string
