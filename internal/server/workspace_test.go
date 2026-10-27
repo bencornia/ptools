@@ -608,3 +608,36 @@ func TestSemanticTokens(t *testing.T) {
 		t.Errorf("got %v, want %v", types, want)
 	}
 }
+
+func TestRenameStaysInTheProject(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":       appProject,
+		"App/PSrc/Events.p":   "event eFoo;\n",
+		"App/PSrc/Main.p":     mainP,
+		"Other/Other.pproj":   appProject,
+		"Other/PSrc/Events.p": "event eFoo;\n",
+		"Other/PSrc/Main.p":   mainP,
+	}, client{})
+
+	edit, err := s.rename(fakeContext(nil), &protocol.RenameParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: pathToURI(filepath.Join(root, "App/PSrc/Events.p"))},
+			Position:     protocol.Position{Line: 0, Character: 6},
+		},
+		NewName: "eBar",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for uri, edits := range edit.Changes {
+		rel, _ := filepath.Rel(root, uriToPath(uri))
+		for _, e := range edits {
+			got = append(got, rel+":"+itoa(int(e.Range.Start.Line)+1)+" "+e.NewText)
+		}
+	}
+	slices.Sort(got)
+	if want := []string{"App/PSrc/Events.p:1 eBar", "App/PSrc/Main.p:3 eBar"}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

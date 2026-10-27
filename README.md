@@ -175,7 +175,7 @@ such as `["-compiler", ""]`.
 - [x] Completion: names in scope, fields after `.`, states after `goto`, and keywords
 - [x] Semantic tokens: names colored by what they refer to, plus keywords, comments, strings and numbers
 - [x] Folding (braces and comments) and selection ranges (expand selection by syntax node)
-- [ ] Tests for `internal/server`
+- [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
 
 ### Grammar ([tree-sitter-p](https://github.com/bencornia/tree-sitter-p))
