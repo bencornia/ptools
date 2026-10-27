@@ -78,6 +78,7 @@ func New(version string) *Server {
 		TextDocumentHover:               s.hover,
 		TextDocumentCompletion:          s.completion,
 		TextDocumentCodeAction:          s.codeAction,
+		TextDocumentSignatureHelp:       s.signatureHelp,
 		TextDocumentFoldingRange:        s.foldingRange,
 		TextDocumentSelectionRange:      s.selectionRange,
 		TextDocumentSemanticTokensFull:  s.semanticTokensFull,
@@ -126,6 +127,13 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 
 	capabilities.CodeActionProvider = protocol.CodeActionOptions{
 		CodeActionKinds: []protocol.CodeActionKind{protocol.CodeActionKindQuickFix},
+	}
+
+	// Show a call's parameters as soon as it's opened, and the next one
+	// after each comma.
+	capabilities.SignatureHelpProvider = &protocol.SignatureHelpOptions{
+		TriggerCharacters:   []string{"(", ","},
+		RetriggerCharacters: []string{","},
 	}
 
 	// Complete fields as soon as a `.` is typed.
@@ -202,6 +210,17 @@ func (s *Server) documentSymbol(_ *glsp.Context, params *protocol.DocumentSymbol
 		return nil, nil
 	}
 	return analysis.Symbols(doc), nil
+}
+
+func (s *Server) signatureHelp(_ *glsp.Context, params *protocol.SignatureHelpParams) (*protocol.SignatureHelp, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil, nil
+	}
+	return analysis.SignatureHelp(s.visibleDocs(path), doc, params.Position), nil
 }
 
 // codeAction offers the fixes for problems in the requested range.
