@@ -21,8 +21,14 @@ reuse a stale cached parser.
 
 ## Running
 
-The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
-`*.p` files. Logs go to stderr; pass `-v 2` for more of them.
+The server speaks LSP over stdin/stdout. The editor setups below expect
+`p-lsp` on your `PATH`, so build it there, for example:
+
+```sh
+go build -o ~/.local/bin/p-lsp .
+```
+
+Logs go to stderr; pass `-v 2` for more of them.
 
 Saving a file that's listed in a `.pproj` type-checks its project with the
 [P compiler](https://p-org.github.io/P/getstarted/install/), and its errors
@@ -41,6 +47,96 @@ export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
 
 P 3.1.0 stops at the first type error, so errors are reported one at a time;
 newer compilers report them all at once.
+
+## Editor setup
+
+Open the folder that holds your `.pproj` files (or a parent of them) as the
+workspace. A file opened on its own still works: the server searches its
+parent directories for a `.pproj` that lists it.
+
+### Helix
+
+Helix doesn't use semantic tokens, so colors come from the tree-sitter-p
+grammar. Add this to `~/.config/helix/languages.toml`:
+
+```toml
+# Only fetch and build P's grammar with `hx --grammar`; Helix's own
+# grammars are already built.
+use-grammars = { only = ["p"] }
+
+[language-server.p-lsp]
+command = "p-lsp"
+
+[[language]]
+name = "p"
+scope = "source.p"
+file-types = ["p"]
+comment-token = "//"
+block-comment-tokens = { start = "/*", end = "*/" }
+indent = { tab-width = 4, unit = "    " }
+language-servers = ["p-lsp"]
+
+[[grammar]]
+name = "p"
+source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "837de5aecdf558402c195172412c887223e9bcb0" }
+```
+
+Then build the grammar and install its highlight queries. Helix doesn't
+create the grammars directory itself:
+
+```sh
+mkdir -p ~/.config/helix/runtime/grammars ~/.config/helix/runtime/queries/p
+hx --grammar fetch && hx --grammar build
+cp ~/.config/helix/runtime/grammars/sources/p/queries/highlights.scm ~/.config/helix/runtime/queries/p/
+hx --health p
+```
+
+To pick up grammar changes, update `rev` and run the last three commands
+again. `space d` lists errors (syntax errors as you type, type errors on
+save), and `gd`, `gr`, `space k`, `space r`, `space s` and `space S` are
+definition, references, hover, rename and symbols.
+
+### Neovim
+
+For Neovim 0.11 or later. Neovim detects `.p` files as Pascal or Progress,
+so claim the extension first. With no tree-sitter parser for P, the
+server's semantic tokens do the highlighting.
+
+```lua
+vim.filetype.add({ extension = { p = 'p' } })
+
+vim.lsp.config('p_lsp', {
+  cmd = { 'p-lsp' },
+  filetypes = { 'p' },
+  root_markers = { '.git' },
+})
+vim.lsp.enable('p_lsp')
+
+-- Optional: fold with the server's folding ranges.
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'p',
+  callback = function()
+    vim.wo.foldmethod = 'expr'
+    vim.wo.foldexpr = 'v:lua.vim.lsp.foldexpr()'
+  end,
+})
+```
+
+### VS Code
+
+VS Code needs an extension to start a language server; a minimal one is in
+`editors/vscode`. Package and install it:
+
+```sh
+cd editors/vscode
+npm install
+npx @vscode/vsce package --skip-license
+code --install-extension p-lsp-0.1.0.vsix
+```
+
+It highlights with the server's semantic tokens. Set `p-lsp.path` if
+`p-lsp` isn't on the `PATH` VS Code sees, and `p-lsp.args` to pass flags
+such as `["-compiler", ""]`.
 
 ## TODO
 
@@ -67,7 +163,7 @@ newer compilers report them all at once.
 - [x] Semantic tokens: names colored by what they refer to, plus keywords, comments, strings and numbers
 - [x] Folding (braces and comments) and selection ranges (expand selection by syntax node)
 - [ ] Tests for `internal/server`
-- [ ] Editor setup instructions (VS Code, Neovim)
+- [x] Editor setup instructions (Helix, Neovim, VS Code)
 
 ### Grammar ([tree-sitter-p](https://github.com/bencornia/tree-sitter-p))
 

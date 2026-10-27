@@ -1,0 +1,53 @@
+{
+  "name": "p-lsp",
+  "displayName": "P language server",
+  "description": "Runs p-lsp for P (.p) files",
+  "version": "0.1.0",
+  "publisher": "bencornia",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bencornia/p-lsp"
+  },
+  "engines": {
+    "vscode": "^1.91.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "p",
+        "aliases": [
+          "P"
+        ],
+        "extensions": [
+          ".p"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "configuration": {
+      "title": "P",
+      "properties": {
+        "p-lsp.path": {
+          "type": "string",
+          "default": "p-lsp",
+          "description": "The p-lsp binary to run."
+        },
+        "p-lsp.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Arguments to pass to p-lsp, such as [\"-compiler\", \"\"] to turn off type checking."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "10.1.2"
+  }
+}
