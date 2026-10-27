@@ -133,7 +133,7 @@ func TestDefinition(t *testing.T) {
 		{"state tested with is uses the instance's machine", "c is Wait", 1, 5, []target{{clientURI, "Wait", 2}}},
 		{"invariant in a Lemma is prefixed with its name", "lemmas_waiting", 1, 0, []target{{clientURI, "waiting:", 1}}},
 		{"invariant in a Lemma resolves to itself", "waiting:", 1, 0, []target{{clientURI, "waiting:", 1}}},
-		{"tuple field is unresolved", "req.amount", 1, 4, nil},
+		{"field of an undeclared variable is unresolved", "req.amount", 1, 4, nil},
 		{"named tuple field is unresolved", "source = this", 1, 0, nil},
 		{"keyword is unresolved", "goto Init", 1, 0, nil},
 	}

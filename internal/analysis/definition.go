@@ -43,7 +43,7 @@ func Definition(workspace []*Document, doc *Document, pos protocol.Position) []p
 
 func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declaration {
 	if isFieldName(ident) {
-		return nil
+		return resolveFieldName(workspace, doc, ident)
 	}
 	if isGroupedInvariantName(ident) {
 		// References spell it <group>_<name>, so it can't be looked up by
@@ -112,17 +112,12 @@ func testedStates(workspace []*Document, doc *Document, test *sitter.Node) []dec
 // with, as in `var c: Coordinator` or `(c: Coordinator)`, or "" if it isn't
 // declared with a named type.
 func declaredTypeName(d declaration) string {
-	decl := d.node.Parent()
-	if decl.Kind() == "identifier_list" {
-		decl = decl.Parent()
-	}
-	if decl.Kind() != "function_param" && decl.Kind() != "var_declaration" {
+	t, ok := declaredType(d)
+	if !ok || t.node.Kind() != "named_type" {
 		return ""
 	}
-	if typ := firstChildOfKind(decl, "named_type"); typ != nil {
-		if name := typ.ChildByFieldName("name"); name != nil {
-			return name.Utf8Text(d.doc.Text)
-		}
+	if name := t.node.ChildByFieldName("name"); name != nil {
+		return name.Utf8Text(t.doc.Text)
 	}
 	return ""
 }
@@ -144,8 +139,8 @@ func identifierAt(doc *Document, pos protocol.Position) *sitter.Node {
 	return nil
 }
 
-// isFieldName reports whether ident names a tuple field, which can't be
-// resolved without knowing the tuple's type.
+// isFieldName reports whether ident names a tuple field, which is resolved
+// through types rather than scopes.
 func isFieldName(ident *sitter.Node) bool {
 	parent := ident.Parent()
 	switch parent.Kind() {
@@ -158,6 +153,20 @@ func isFieldName(ident *sitter.Node) bool {
 		return true
 	}
 	return false
+}
+
+func resolveFieldName(workspace []*Document, doc *Document, ident *sitter.Node) []declaration {
+	parent := ident.Parent()
+	switch parent.Kind() {
+	case "named_tuple_access_expression", "named_tuple_lvalue":
+		return resolveField(workspace, doc, parent, ident)
+	case "identifier_type":
+		// The field's own declaration in a named tuple type.
+		return declarationsOf(doc, []*sitter.Node{ident})
+	}
+	// A field in a tuple value, as in `(source = this, amount = 1)`, belongs
+	// to whatever type the context expects, which isn't inferred.
+	return nil
 }
 
 func namespaceOf(ident *sitter.Node) namespace {
