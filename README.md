@@ -66,6 +66,40 @@ auto-format = true
 For another width, change `unit` and pass it to pfmt too, as in
 `formatter = { command = "pfmt", args = ["-indent", "2"] }`.
 
+## Neovim and VS Code
+
+[p-lsp](https://github.com/bencornia/p-lsp) formats with pfmt, so with p-lsp
+set up, the editor's own formatting commands work, using the editor's tab
+size as the indent width.
+
+In Neovim, format with `vim.lsp.buf.format()`, or on every save:
+
+```lua
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*.p',
+  callback = function() vim.lsp.buf.format() end,
+})
+```
+
+Without p-lsp, `gq` can run pfmt directly:
+
+```lua
+vim.api.nvim_create_autocmd('FileType', {
+  pattern = 'p',
+  callback = function() vim.bo.formatprg = 'pfmt' end,
+})
+```
+
+In VS Code, use Format Document, or format on save with this in
+`settings.json`:
+
+```json
+"[p]": {
+  "editor.formatOnSave": true,
+  "editor.tabSize": 4
+}
+```
+
 ## Developing
 
 ```sh
@@ -84,5 +118,5 @@ changes nothing. All of github.com/p-org/P passes.
 - [x] `pfmt` command: stdin, files and directories, `-w`, `-l`, `-indent`
 - [x] Tests, and a corpus test over the P repo
 - [x] `-d` to print diffs instead of formatted files
-- [ ] `textDocument/formatting` in p-lsp, using the `format` package
-- [ ] Editor setup for Neovim and VS Code
+- [x] `textDocument/formatting` in p-lsp, using the `format` package
+- [x] Editor setup for Neovim and VS Code
