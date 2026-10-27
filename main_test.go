@@ -259,19 +259,20 @@ func TestProtocol(t *testing.T) {
 		}},
 	}, &init)
 	for capability, want := range map[string]string{
-		"textDocumentSync":        `"change":1`,
-		"completionProvider":      `"triggerCharacters":["."]`,
-		"renameProvider":          `"prepareProvider":true`,
-		"semanticTokensProvider":  `"tokenTypes":["namespace"`,
-		"definitionProvider":      `true`,
-		"referencesProvider":      `true`,
-		"hoverProvider":           `true`,
-		"documentSymbolProvider":  `true`,
-		"workspaceSymbolProvider": `true`,
-		"foldingRangeProvider":    `true`,
-		"selectionRangeProvider":  `true`,
-		"codeActionProvider":      `"codeActionKinds":["quickfix"]`,
-		"signatureHelpProvider":   `"triggerCharacters":["(",","]`,
+		"textDocumentSync":           `"change":1`,
+		"completionProvider":         `"triggerCharacters":["."]`,
+		"renameProvider":             `"prepareProvider":true`,
+		"semanticTokensProvider":     `"tokenTypes":["namespace"`,
+		"definitionProvider":         `true`,
+		"referencesProvider":         `true`,
+		"hoverProvider":              `true`,
+		"documentSymbolProvider":     `true`,
+		"workspaceSymbolProvider":    `true`,
+		"foldingRangeProvider":       `true`,
+		"selectionRangeProvider":     `true`,
+		"codeActionProvider":         `"codeActionKinds":["quickfix"]`,
+		"signatureHelpProvider":      `"triggerCharacters":["(",","]`,
+		"documentFormattingProvider": `true`,
 	} {
 		if got := string(init.Capabilities[capability]); !strings.Contains(got, want) {
 			t.Errorf("capability %s = %s, want it to contain %s", capability, got, want)

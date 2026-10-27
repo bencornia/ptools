@@ -88,6 +88,8 @@ comment-token = "//"
 block-comment-tokens = { start = "/*", end = "*/" }
 indent = { tab-width = 4, unit = "    " }
 language-servers = ["p-lsp"]
+# Format with pfmt, through the server, on save.
+auto-format = true
 
 [[grammar]]
 name = "p"
@@ -133,6 +135,12 @@ vim.api.nvim_create_autocmd('FileType', {
     vim.wo.foldexpr = 'v:lua.vim.lsp.foldexpr()'
   end,
 })
+
+-- Optional: format with pfmt on save.
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*.p',
+  callback = function() vim.lsp.buf.format() end,
+})
 ```
 
 ### VS Code
@@ -149,7 +157,8 @@ code --install-extension p-lsp-0.1.0.vsix
 
 It highlights with the server's semantic tokens. Set `p-lsp.path` if
 `p-lsp` isn't on the `PATH` VS Code sees, and `p-lsp.args` to pass flags
-such as `["-compiler", ""]`.
+such as `["-compiler", ""]`. Format Document formats with pfmt; to format
+on save, add `"[p]": { "editor.formatOnSave": true }` to `settings.json`.
 
 ## TODO
 
@@ -180,6 +189,7 @@ such as `["-compiler", ""]`.
 - [x] Quick fix: declare an undefined event, with its payload type taken from how it's handled or sent
 - [x] Quick fix: change a misspelled name to the closest name in scope (variables, functions, types, states, modules, fields, events)
 - [x] Signature help: a function's parameters, a machine's start parameter after `new`, or an event's payload type in `send`, `raise` and `announce`, while typing arguments
+- [x] Formatting with [pfmt](https://github.com/bencornia/pfmt), indenting by the editor's tab size
 - [x] Merge the full-tree passes behind diagnostics (tuple checks, undefined events and names, empty receives) into one walk, to speed up large files
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)

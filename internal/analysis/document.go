@@ -183,6 +183,11 @@ func (d *Document) lineLength(row uint) uint {
 	return uint(end - start)
 }
 
+// PositionAt converts a byte offset in the text to an LSP position.
+func (d *Document) PositionAt(offset uint) protocol.Position {
+	return d.Position(pointAt(d, offset))
+}
+
 // WordRange returns the range of the token at pos, such as a name or keyword,
 // or of the single character there if there's no token, for underlining an
 // error the compiler reported at a position.

@@ -79,6 +79,7 @@ func New(version string) *Server {
 		TextDocumentCompletion:          s.completion,
 		TextDocumentCodeAction:          s.codeAction,
 		TextDocumentSignatureHelp:       s.signatureHelp,
+		TextDocumentFormatting:          s.formatting,
 		TextDocumentFoldingRange:        s.foldingRange,
 		TextDocumentSelectionRange:      s.selectionRange,
 		TextDocumentSemanticTokensFull:  s.semanticTokensFull,
