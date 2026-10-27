@@ -67,6 +67,7 @@ func New(version string) *Server {
 		TextDocumentDocumentSymbol:     s.documentSymbol,
 		TextDocumentDefinition:         s.definition,
 		TextDocumentReferences:         s.references,
+		TextDocumentHover:              s.hover,
 		WorkspaceDidChangeWatchedFiles: s.didChangeWatchedFiles,
 	}
 	return s
@@ -180,6 +181,17 @@ func (s *Server) definition(_ *glsp.Context, params *protocol.DefinitionParams) 
 	}
 	workspace := s.visibleDocs(path)
 	return analysis.Definition(workspace, doc, params.Position), nil
+}
+
+func (s *Server) hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol.Hover, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil, nil
+	}
+	return analysis.Hover(s.visibleDocs(path), doc, params.Position), nil
 }
 
 func (s *Server) references(_ *glsp.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {

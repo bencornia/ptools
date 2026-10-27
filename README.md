@@ -40,7 +40,7 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 - [x] Go to definition for fields in tuple values, like `(source = this)`, from the type their context expects
 - [x] Find references
 - [x] Narrower fallback for files in no `.pproj`: their example (under the `PSrc`/`PSpec`/`PTst` layout) or their own directory, not the whole workspace
-- [ ] Hover (show a symbol's declaration)
+- [x] Hover: a symbol's signature, doc comment, and file if declared elsewhere
 - [ ] Rename
 - [ ] Workspace symbol search
 - [ ] Type-check diagnostics from `p compile` on save
