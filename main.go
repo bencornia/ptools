@@ -22,7 +22,7 @@ import (
 func main() {
 	write := flag.Bool("w", false, "write the result to the files instead of printing it")
 	list := flag.Bool("l", false, "list the files whose formatting differs")
-	indent := flag.Int("indent", 2, "spaces per indentation level")
+	indent := flag.Int("indent", 4, "spaces per indentation level")
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "usage: pfmt [flags] [path ...]\n")
 		flag.PrintDefaults()

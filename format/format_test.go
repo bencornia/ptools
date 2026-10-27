@@ -45,14 +45,14 @@ func TestSource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := Source([]byte(tt.in), Options{})
+			got, err := Source([]byte(tt.in), Options{Indent: 2})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if string(got) != tt.want {
 				t.Errorf("got\n%s\nwant\n%s", got, tt.want)
 			}
-			again, err := Source(got, Options{})
+			again, err := Source(got, Options{Indent: 2})
 			if err != nil || !bytes.Equal(again, got) {
 				t.Errorf("formatting again changed it:\n%s", again)
 			}
@@ -61,9 +61,18 @@ func TestSource(t *testing.T) {
 }
 
 func TestIndentOption(t *testing.T) {
-	got, err := Source([]byte("fun F() {\nx = 1;\n}\n"), Options{Indent: 4})
-	if err != nil || string(got) != "fun F() {\n    x = 1;\n}\n" {
-		t.Errorf("got %q, %v", got, err)
+	for _, tt := range []struct {
+		indent int
+		want   string
+	}{
+		{0, "fun F() {\n    x = 1;\n}\n"}, // the default
+		{4, "fun F() {\n    x = 1;\n}\n"},
+		{3, "fun F() {\n   x = 1;\n}\n"},
+	} {
+		got, err := Source([]byte("fun F() {\nx = 1;\n}\n"), Options{Indent: tt.indent})
+		if err != nil || string(got) != tt.want {
+			t.Errorf("indent %d: got %q, %v", tt.indent, got, err)
+		}
 	}
 }
 

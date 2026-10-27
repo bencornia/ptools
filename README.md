@@ -6,10 +6,10 @@ built on [tree-sitter-p](https://github.com/bencornia/tree-sitter-p).
 Like `gofmt`, it keeps your code's shape: its tokens, the line breaks
 between them, and comments. It normalizes the whitespace:
 
-- Indentation: one level per block, a closing bracket lines up with the
-  line that opened it, and a statement continued on the next line, or the
-  statement after a brace-less `if`, `else`, `while` or `foreach`, is one
-  level deeper.
+- Indentation: 4 spaces per level by default, one level per block. A
+  closing bracket lines up with the line that opened it, and a statement
+  continued on the next line, or the statement after a brace-less `if`,
+  `else`, `while` or `foreach`, is one level deeper.
 - Spacing on a line: around operators, after commas, before `{`, after the
   `:` in `x: int`, none between a function and its `(`, and one between a
   keyword and its `(`, as in `if (x)`.
@@ -42,7 +42,7 @@ pfmt < Client.p            # format standard input to standard output
 pfmt PSrc/Client.p         # print the formatted file
 pfmt -w .                  # format every .p file under the directory in place
 pfmt -l .                  # list the files whose formatting differs
-pfmt -indent 4 Client.p    # indent with 4 spaces instead of 2
+pfmt -indent 2 Client.p    # indent with 2 spaces instead of 4
 ```
 
 It exits with status 1 if a file couldn't be formatted, and 2 for bad usage
@@ -57,13 +57,13 @@ match its indentation:
 [[language]]
 name = "p"
 # ...
-indent = { tab-width = 2, unit = "  " }
+indent = { tab-width = 4, unit = "    " }
 formatter = { command = "pfmt" }
 auto-format = true
 ```
 
-For 4-space indentation, use `unit = "    "` and
-`formatter = { command = "pfmt", args = ["-indent", "4"] }`.
+For another width, change `unit` and pass it to pfmt too, as in
+`formatter = { command = "pfmt", args = ["-indent", "2"] }`.
 
 ## Developing
 

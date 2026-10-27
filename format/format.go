@@ -19,7 +19,7 @@ import (
 
 // Options controls formatting.
 type Options struct {
-	// Indent is the number of spaces per indentation level; 0 means 2.
+	// Indent is the number of spaces per indentation level; 0 means 4.
 	Indent int
 }
 
@@ -30,7 +30,7 @@ var ErrSyntax = errors.New("syntax error")
 // Source formats P source code.
 func Source(src []byte, opts Options) ([]byte, error) {
 	if opts.Indent <= 0 {
-		opts.Indent = 2
+		opts.Indent = 4
 	}
 	parser := newParser()
 	defer parser.Close()
