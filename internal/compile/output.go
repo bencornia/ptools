@@ -33,11 +33,11 @@ var (
 	notSupported = regexp.MustCompile(`^\[NotSupportedError:\] (.+) \(line (\d+):(\d+)\): (.*)$`)
 	// Any other error, such as "[Error:] <no source>:-1:-1 message".
 	otherError = regexp.MustCompile(`^\[(?:[A-Za-z]+ )?(?:Error|NotSupportedError|NotImplementedError):\] (.*)$`)
-	// Before P 3.1, the "[Error:]" part was on a line of its own, and the
-	// rest of the error on the next line.
 	// Error: message, for errors in the project file, such as one that
 	// lists no .p files.
 	plainError = regexp.MustCompile(`^Error: (.+)$`)
+	// Before P 3.1, the "[Error:]" part was on a line of its own, and the
+	// rest of the error on the next line.
 	errorHeading = regexp.MustCompile(`^\[(?:[A-Za-z]+ )?(?:Error|NotSupportedError|NotImplementedError):\]$`)
 )
 
