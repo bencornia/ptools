@@ -30,27 +30,6 @@ func Fixes(workspace []*Document, doc *Document) []Fix {
 	return append(syntaxFixes(doc), typeFixes(workspace, doc)...)
 }
 
-// syntaxFixes fixes syntax errors with an obvious cause: a one-field tuple
-// such as `(a = 1)`, which needs a trailing comma.
-func syntaxFixes(doc *Document) []Fix {
-	fixes := []Fix{}
-	walkNodes(doc.Tree.RootNode(), func(n *sitter.Node) bool {
-		if !n.HasError() {
-			return false
-		}
-		if isMissingTupleComma(n) {
-			at := doc.Range(n).Start
-			fixes = append(fixes, Fix{
-				Diagnostic: syntaxDiagnostic(doc.Range(n), missingTupleCommaMessage(doc, n.Parent())),
-				Title:      "Add a trailing comma",
-				Edits:      []protocol.TextEdit{{Range: protocol.Range{Start: at, End: at}, NewText: ","}},
-			})
-		}
-		return true
-	})
-	return fixes
-}
-
 // isMissingTupleComma reports whether n is the comma tree-sitter expected
 // after a tuple's only field, as in `(a = 1)`.
 func isMissingTupleComma(n *sitter.Node) bool {

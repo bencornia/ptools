@@ -176,6 +176,10 @@ such as `["-compiler", ""]`.
 - [x] Semantic tokens: names colored by what they refer to, plus keywords, comments, strings and numbers
 - [x] Folding (braces and comments) and selection ranges (expand selection by syntax node)
 - [x] Quick fixes: add the trailing comma a one-field tuple needs, for `(a = 1)` (a syntax error) and `(1)` where a tuple is expected (a type error the compiler only reports on save)
+- [x] Quick fix: add a missing `;` (or other token tree-sitter finds missing), including between top-level declarations
+- [ ] Quick fix: declare an undefined event
+- [ ] Quick fix: change a misspelled name to the closest name in scope
+- [ ] Signature help: a function's parameters, or an event's payload type, while typing arguments
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
 

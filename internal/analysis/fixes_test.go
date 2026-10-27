@@ -78,3 +78,46 @@ func TestFixes(t *testing.T) {
 		})
 	}
 }
+
+func TestMissingTokenFixes(t *testing.T) {
+	tests := []struct {
+		name, text, title string
+	}{
+		{"statement", "fun F() {\n  x = 1\n}\n", "Insert `;`"},
+		{"call statement", "fun F() {\n  G(1)\n  x = 1;\n}\n", "Insert `;`"},
+		{"machine variable", "machine M {\n  var x: int\n  var y: int;\n}\n", "Insert `;`"},
+		{"top-level declaration followed by another", "event eFoo\nevent eBar;\n", "Insert `;`"},
+		{"type followed by an event, with a comment between", "type T = int\n// eBar\nevent eBar;\n", "Insert `;`"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			doc := parse(t, tt.text)
+			fixes := Fixes([]*Document{doc}, doc)
+			if len(fixes) != 1 {
+				t.Fatalf("got %d fixes, want 1; diagnostics %+v", len(fixes), SyntaxDiagnostics(doc))
+			}
+			if fixes[0].Title != tt.title {
+				t.Errorf("title %q, want %q", fixes[0].Title, tt.title)
+			}
+			fixed := applyEdits(t, tt.text, fixes[0].Edits)
+			if diags := SyntaxDiagnostics(parse(t, fixed)); len(diags) != 0 {
+				t.Errorf("after the fix:\n%s\nstill has %+v", fixed, diags)
+			}
+			// The fix's problem is what's reported, once.
+			if diags := SyntaxDiagnostics(doc); len(diags) != 1 || diags[0].Message != fixes[0].Diagnostic.Message {
+				t.Errorf("diagnostics %+v", diags)
+			}
+		})
+	}
+}
+
+func TestUnclearSyntaxErrorsHaveNoFix(t *testing.T) {
+	// A stray token: inserting a `;` wouldn't help.
+	doc := parse(t, "event eFoo;\n@ event eBar;\n")
+	if fixes := Fixes([]*Document{doc}, doc); len(fixes) != 0 {
+		t.Errorf("got fix %+v", fixes[0])
+	}
+	if diags := SyntaxDiagnostics(doc); len(diags) == 0 {
+		t.Error("the error isn't reported")
+	}
+}
