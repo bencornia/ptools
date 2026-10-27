@@ -161,3 +161,15 @@ func TestPositionCountsUTF16(t *testing.T) {
 		t.Errorf("comment end = %+v, want line 0 character 6", end)
 	}
 }
+
+func TestCallStatementNeedsSemicolon(t *testing.T) {
+	doc := parse(t, "fun f() {\n  g(1)\n}\n")
+	diags := SyntaxDiagnostics(doc)
+	want := protocol.Position{Line: 1, Character: 6}
+	if len(diags) != 1 || diags[0].Range.Start != want || diags[0].Message != "expected `;`" {
+		t.Errorf("got %+v, want \"expected `;`\" at %+v", diags, want)
+	}
+	if diags := SyntaxDiagnostics(parse(t, "fun f() {\n  g(1);\n}\n")); len(diags) != 0 {
+		t.Errorf("with the semicolon, got %+v", diags)
+	}
+}

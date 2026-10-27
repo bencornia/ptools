@@ -58,8 +58,8 @@ export DOTNET_ROOT="$HOME/.dotnet"
 export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
 ```
 
-P 3.1.0 stops at the first type error, so errors are reported one at a time;
-newer compilers report them all at once.
+P 3.0 stops at the first error, so errors are reported one at a time; P 3.1
+reports several at once. Both versions' output formats are understood.
 
 ## Editor setup
 
@@ -91,7 +91,7 @@ language-servers = ["p-lsp"]
 
 [[grammar]]
 name = "p"
-source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "4a5fd7cded6278fb32ccfa206e7c90ad6f423136" }
+source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "7778bce878c77ae46159db3ec19c05d260e87409" }
 ```
 
 Then build the grammar and install its highlight queries. Helix doesn't
@@ -175,6 +175,7 @@ such as `["-compiler", ""]`.
 - [x] Completion: names in scope, fields after `.`, states after `goto`, and keywords
 - [x] Semantic tokens: names colored by what they refer to, plus keywords, comments, strings and numbers
 - [x] Folding (braces and comments) and selection ranges (expand selection by syntax node)
+- [x] Quick fixes: add the trailing comma a one-field tuple needs, for `(a = 1)` (a syntax error) and `(1)` where a tuple is expected (a type error the compiler only reports on save)
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
 
@@ -193,3 +194,4 @@ such as `["-compiler", ""]`.
 - [x] Add `locals.scm` (definitions, references, scopes)
 - [x] Add `tags.scm`
 - [x] Grow `test/corpus` from the P repo's `Tst/` and `Tutorial/` programs
+- [x] Add `textobjects.scm` (functions and handlers, machines, parameters, comments, tests) and `indents.scm`
