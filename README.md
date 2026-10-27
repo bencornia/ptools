@@ -37,7 +37,7 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
       in editors that support LSP 3.17 relative watch patterns
 - [x] Find a file's `.pproj` by searching parent directories when it's opened outside the workspace
 - [x] Go to definition for tuple fields, and the P verifier's machine and event fields
-- [ ] Go to definition for fields in tuple values, like `(source = this)`, which needs the expected type
+- [x] Go to definition for fields in tuple values, like `(source = this)`, from the type their context expects
 - [ ] Find references
 - [ ] Hover (show a symbol's declaration)
 - [ ] Rename

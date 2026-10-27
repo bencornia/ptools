@@ -42,6 +42,10 @@ func Definition(workspace []*Document, doc *Document, pos protocol.Position) []p
 }
 
 func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declaration {
+	if ident == nil {
+		// A name tree-sitter's error recovery left out.
+		return nil
+	}
 	if isFieldName(ident) {
 		return resolveFieldName(workspace, doc, ident)
 	}
@@ -163,9 +167,10 @@ func resolveFieldName(workspace []*Document, doc *Document, ident *sitter.Node) 
 	case "identifier_type":
 		// The field's own declaration in a named tuple type.
 		return declarationsOf(doc, []*sitter.Node{ident})
+	case "named_tuple_body":
+		// A field in a tuple value, as in `(source = this, amount = 1)`.
+		return resolveValueField(workspace, doc, parent, ident)
 	}
-	// A field in a tuple value, as in `(source = this, amount = 1)`, belongs
-	// to whatever type the context expects, which isn't inferred.
 	return nil
 }
 

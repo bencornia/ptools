@@ -63,6 +63,305 @@ func specReference(workspace []*Document, doc *Document, expr *sitter.Node) (dec
 	return declaration{}, false
 }
 
+// resolveValueField resolves a field name in a tuple value, as in
+// `(source = this, amount = 1)`, through the type its context expects.
+func resolveValueField(workspace []*Document, doc *Document, body, field *sitter.Node) []declaration {
+	t, ok := expectedType(workspace, doc, body.Parent())
+	if !ok {
+		return nil
+	}
+	if f, ok := fieldOf(workspace, t, field.Utf8Text(doc.Text)); ok {
+		return []declaration{f}
+	}
+	return nil
+}
+
+// expectedType returns the type that value's context expects it to have:
+// the target of an assignment, a function's return or parameter type, an
+// event's payload, a state's or machine's entry parameter, or the type of the
+// enclosing tuple's field.
+func expectedType(workspace []*Document, doc *Document, value *sitter.Node) (typeRef, bool) {
+	node := value
+	if p := node.Parent(); p != nil && p.Kind() == "rvalue" {
+		node = p
+	}
+	context := node.Parent()
+	if context == nil {
+		return typeRef{}, false
+	}
+
+	switch context.Kind() {
+	case "assign_statement":
+		return typeOf(workspace, doc, context.NamedChild(0))
+	case "return_statement":
+		for fn := context.Parent(); fn != nil; fn = fn.Parent() {
+			switch fn.Kind() {
+			case "p_function_declaration":
+				if name := fn.ChildByFieldName("name"); name != nil {
+					return returnType(declaration{doc: doc, node: name})
+				}
+				return typeRef{}, false
+			case "anon_event_handler", "no_param_anon_event_handler":
+				// Event handlers don't return values.
+				return typeRef{}, false
+			}
+		}
+	case "rvalue_list":
+		return argumentType(workspace, doc, context, node)
+	case "named_tuple_body":
+		// The value of field f: the identifier just before it names f.
+		outer, ok := expectedType(workspace, doc, context.Parent())
+		if !ok {
+			return typeRef{}, false
+		}
+		var prev *sitter.Node
+		for _, child := range namedChildren(context) {
+			if sameNode(child, node) && prev != nil && prev.Kind() == "identifier" {
+				if f, ok := fieldOf(workspace, outer, prev.Utf8Text(doc.Text)); ok {
+					return declaredType(f)
+				}
+				break
+			}
+			prev = child
+		}
+	case "unnamed_tuple_body":
+		outer, ok := expectedType(workspace, doc, context.Parent())
+		if !ok {
+			return typeRef{}, false
+		}
+		return tupleTypeElement(workspace, outer, indexOf(context, node))
+	case "paren_expression":
+		return expectedType(workspace, doc, context)
+	case "insert_statement":
+		// `c += (key, value)`: a map's key and value, or a sequence's index
+		// and element.
+		c, ok := typeOf(workspace, doc, context.NamedChild(0))
+		if !ok {
+			return typeRef{}, false
+		}
+		if indexOf(context, node) == 1 {
+			return collectionType(workspace, c, "map_type", "key_type")
+		}
+		return elementType(workspace, c)
+	case "add_statement":
+		// `s += (element)` adds to a set.
+		if c, ok := typeOf(workspace, doc, context.NamedChild(0)); ok {
+			return collectionType(workspace, c, "set_type", "")
+		}
+	case "remove_statement":
+		// `c -= key` removes a set's element or a map's key. (A sequence's
+		// is removed by index.)
+		if c, ok := typeOf(workspace, doc, context.NamedChild(0)); ok {
+			if t, ok := collectionType(workspace, c, "map_type", "key_type"); ok {
+				return t, true
+			}
+			return collectionType(workspace, c, "set_type", "")
+		}
+	case "bin_expression":
+		// `value in c`
+		if op := context.ChildByFieldName("op"); op != nil && op.Kind() == "in" && sameNode(context.ChildByFieldName("lhs"), node) {
+			if c, ok := typeOf(workspace, doc, context.ChildByFieldName("rhs")); ok {
+				return memberType(workspace, c)
+			}
+		}
+	case "map_or_sequence_lvalue", "seq_access_expression":
+		// `m[key]`
+		container := context.ChildByFieldName("seq")
+		if container == nil {
+			container = context.NamedChild(0)
+		}
+		if !sameNode(container, node) {
+			if c, ok := typeOf(workspace, doc, container); ok {
+				return collectionType(workspace, c, "map_type", "key_type")
+			}
+		}
+	}
+	return typeRef{}, false
+}
+
+// collectionType returns a part of collection type t if t is of kind kind:
+// the type in field, or the first type inside it if field is "".
+func collectionType(workspace []*Document, t typeRef, kind, field string) (typeRef, bool) {
+	u, ok := underlying(workspace, t)
+	if !ok || u.node.Kind() != kind {
+		return typeRef{}, false
+	}
+	if field == "" {
+		return typeChild(u.doc, u.node)
+	}
+	if part := u.node.ChildByFieldName(field); part != nil {
+		return typeRef{u.doc, part}, true
+	}
+	return typeRef{}, false
+}
+
+// memberType returns the type that `x in c` and `c -= x` expect x to have: a
+// set's or sequence's element type, or a map's key type.
+func memberType(workspace []*Document, c typeRef) (typeRef, bool) {
+	if t, ok := collectionType(workspace, c, "map_type", "key_type"); ok {
+		return t, true
+	}
+	if t, ok := collectionType(workspace, c, "set_type", ""); ok {
+		return t, true
+	}
+	return collectionType(workspace, c, "sequence_type", "")
+}
+
+// tupleTypeElement returns the i-th element type of an unnamed tuple type.
+func tupleTypeElement(workspace []*Document, t typeRef, i int) (typeRef, bool) {
+	u, ok := underlying(workspace, t)
+	if !ok || u.node.Kind() != "tuple_type" {
+		return typeRef{}, false
+	}
+	elements := u.node.ChildrenByFieldName("tup_types", u.node.Walk())
+	if i < 0 || i >= len(elements) {
+		return typeRef{}, false
+	}
+	return typeRef{u.doc, &elements[i]}, true
+}
+
+// callParameters returns the names of a function's parameters, leaving out
+// a foreign function's `return (result: T)`.
+func callParameters(fn *sitter.Node) []*sitter.Node {
+	if list := firstChildOfKind(fn, "function_param_list"); list != nil {
+		return paramNames(list)
+	}
+	return nil
+}
+
+// argumentType returns the type expected of arg, one of the values in list:
+// a function call's arguments, or the payload of send, raise, announce, goto
+// or new.
+func argumentType(workspace []*Document, doc *Document, list, arg *sitter.Node) (typeRef, bool) {
+	i, n := indexOf(list, arg), int(list.NamedChildCount())
+	statement := list.Parent()
+	var payload typeRef
+	var ok bool
+
+	switch statement.Kind() {
+	case "function_call_expression", "function_call_statement":
+		fun := statement.ChildByFieldName("fun")
+		if fun == nil {
+			fun = statement.NamedChild(0)
+		}
+		if decls := resolve(workspace, doc, fun); len(decls) == 1 {
+			if params := callParameters(decls[0].node.Parent()); i < len(params) {
+				return declaredType(declaration{doc: decls[0].doc, node: params[i]})
+			}
+		}
+		return typeRef{}, false
+	case "send_statement", "raise_statement", "announce_statement":
+		// The event comes just before the payload: `send target, event,
+		// payload`, `raise event, payload`. Counting named children instead
+		// would miss a target like `this`, which has no named node.
+		if i := indexOf(statement, list); i > 0 {
+			payload, ok = eventPayload(workspace, doc, statement.NamedChild(uint(i-1)))
+		}
+	case "goto_statement":
+		if name := firstChildOfKind(statement, "state_name"); name != nil {
+			if decls := resolve(workspace, doc, name.ChildByFieldName("state")); len(decls) == 1 {
+				payload, ok = entryPayload(workspace, decls[0].doc, decls[0].node.Parent())
+			}
+		}
+	case "ctor_expression", "ctor_statement":
+		machine := statement.ChildByFieldName("interface_name")
+		if machine == nil {
+			machine = statement.NamedChild(0)
+		}
+		if decls := resolve(workspace, doc, machine); len(decls) == 1 {
+			payload, ok = startPayload(workspace, decls[0])
+		}
+	}
+	if !ok {
+		return typeRef{}, false
+	}
+	return payloadElement(workspace, payload, i, n)
+}
+
+// payloadElement returns the type of the i-th of n values passed where
+// payload is expected. A single value is the whole payload; several values
+// fill a tuple payload's elements in order.
+func payloadElement(workspace []*Document, payload typeRef, i, n int) (typeRef, bool) {
+	if n == 1 {
+		return payload, true
+	}
+	u, ok := underlying(workspace, payload)
+	if !ok {
+		return typeRef{}, false
+	}
+	switch u.node.Kind() {
+	case "tuple_type":
+		return tupleTypeElement(workspace, u, i)
+	case "named_tuple_type":
+		if list := firstChildOfKind(u.node, "identifier_type_list"); list != nil && i < int(list.NamedChildCount()) {
+			return typeChild(u.doc, list.NamedChild(uint(i)))
+		}
+	}
+	return typeRef{}, false
+}
+
+// eventPayload returns the payload type of the event an expression names.
+func eventPayload(workspace []*Document, doc *Document, event *sitter.Node) (typeRef, bool) {
+	if event == nil || event.Kind() != "identifier" {
+		return typeRef{}, false
+	}
+	decls := resolve(workspace, doc, event)
+	if len(decls) != 1 || decls[0].node.Parent().Kind() != "event_declaration" {
+		return typeRef{}, false
+	}
+	return typeChild(decls[0].doc, decls[0].node.Parent())
+}
+
+// startPayload returns the entry parameter type of a machine's start state,
+// which is what `new M(payload)` passes its payload to.
+func startPayload(workspace []*Document, machine declaration) (typeRef, bool) {
+	body := machineBody(machine.node.Parent())
+	if body == nil {
+		return typeRef{}, false
+	}
+	for _, entry := range namedChildren(body) {
+		state := entry.NamedChild(0)
+		if state == nil || state.Kind() != "state_declaration" {
+			continue
+		}
+		for i := uint(0); i < state.ChildCount(); i++ {
+			if state.Child(i).Kind() == "start" {
+				return entryPayload(workspace, machine.doc, state)
+			}
+		}
+	}
+	return typeRef{}, false
+}
+
+// entryPayload returns the parameter type of a state's entry handler: an
+// anonymous `entry (p: T) { ... }` or a named `entry F;`.
+func entryPayload(workspace []*Document, doc *Document, state *sitter.Node) (typeRef, bool) {
+	if entry := firstChildOfKind(state, "state_entry_anon"); entry != nil {
+		if handler := firstChildOfKind(entry, "anon_event_handler"); handler != nil {
+			if param := firstChildOfKind(handler, "function_param"); param != nil {
+				return typeChild(doc, param)
+			}
+		}
+	}
+	if entry := firstChildOfKind(state, "state_entry_fun"); entry != nil {
+		if decls := resolve(workspace, doc, entry.ChildByFieldName("function_name")); len(decls) == 1 {
+			if params := callParameters(decls[0].node.Parent()); len(params) > 0 {
+				return declaredType(declaration{doc: decls[0].doc, node: params[0]})
+			}
+		}
+	}
+	return typeRef{}, false
+}
+
+func indexOf(parent, child *sitter.Node) int {
+	for i, c := range namedChildren(parent) {
+		if sameNode(c, child) {
+			return i
+		}
+	}
+	return -1
+}
+
 // typeOf returns the type of an expression or lvalue.
 func typeOf(workspace []*Document, doc *Document, expr *sitter.Node) (typeRef, bool) {
 	if expr == nil {

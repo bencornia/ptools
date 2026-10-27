@@ -82,7 +82,7 @@ func TestFieldDefinition(t *testing.T) {
 		{"field of a primitive", "n.x", "", 0},
 		{"alias cycle", "loop.x", "", 0},
 		{"field of an undeclared variable", "undeclared.x", "", 0},
-		{"field in a tuple value", "(source", "", 0},
+		{"tuple value field uses the event payload type", "(source", "source:", 1},
 	}
 
 	for _, tt := range tests {
@@ -168,6 +168,123 @@ func TestVerifierFieldDefinition(t *testing.T) {
 				return
 			}
 			if want := at(t, verifierSource, tt.want, 1, 0); len(got) != 1 || got[0].Range.Start != want {
+				t.Fatalf("got %+v, want one definition at %+v", got, want)
+			}
+		})
+	}
+}
+
+const tupleValueSource = `type tPt = (x: int, y: int);
+type tBox = (pt: tPt, n: int);
+event ePt : tPt;
+event eTwo : (a: int, pt: tPt);
+fun TakesPt(k: int, p: tPt) {}
+fun MakePt(): tPt { return (x = 1, y = 2); }
+machine Target {
+  start state Init {
+    entry (p: tPt) {}
+  }
+}
+machine Named {
+  start state Init { entry Setup; }
+  fun Setup(p: tPt) {}
+}
+machine M {
+  var box: tBox;
+  var pair: (int, tPt);
+  var target: machine;
+  var pts: set[tPt];
+  var byPt: map[tPt, int];
+  var ptSeq: seq[tPt];
+  var ptMap: map[int, tPt];
+  var count: int;
+  start state S {
+    entry {
+      box = (pt = (x = 10, y = 2), n = 3);
+      pair = (1, (x = 11, y = 2));
+      TakesPt(1, (x = 12, y = 2));
+      send this, ePt, (x = 13, y = 2);
+      send this, eTwo, 1, (x = 14, y = 2);
+      raise ePt, (x = 15, y = 2);
+      announce ePt, (x = 16, y = 2);
+      new Target((x = 17, y = 2));
+      target = new Target((x = 18, y = 2));
+      new Named((x = 19, y = 2));
+      goto Next, (x = 20, y = 2);
+      send this, ePt, (z = 21, y = 2);
+      ptSeq += (0, (x = 24, y = 2));
+      ptMap += (1, (x = 25, y = 2));
+      byPt += ((x = 26, y = 2), 1);
+      pts += ((x = 27, y = 2));
+      pts -= ((x = 28, y = 2));
+      byPt -= ((x = 29, y = 2));
+      if ((x = 30, y = 2) in pts) {}
+      byPt[(x = 31, y = 2)] = 1;
+      count = byPt[(x = 32, y = 2)];
+      if ((x = 33, y = 2) in byPt) {}
+    }
+  }
+  state Next {
+    entry (p: tPt) {}
+    on ePt do {
+      return (x = 22, y = 2);
+    }
+  }
+  fun NotATuple() {
+    var n: int;
+    n = (x = 23, y = 2);
+  }
+}
+`
+
+func TestTupleValueFieldDefinition(t *testing.T) {
+	doc := parse(t, tupleValueSource)
+	if diags := SyntaxDiagnostics(doc); len(diags) > 0 {
+		t.Fatalf("test source has syntax errors: %+v", diags)
+	}
+	tests := []struct {
+		name string
+		// The cursor goes on the first character of cursor.
+		cursor, want string
+	}{
+		{"assignment target", "pt = (", "pt:"},
+		{"field of the assignment target", "n = 3", "n:"},
+		{"nested tuple value", "x = 10", "x:"},
+		{"unnamed tuple element", "x = 11", "x:"},
+		{"function argument", "x = 12", "x:"},
+		{"function return", "x = 1, y = 2); }", "x:"},
+		{"send payload", "x = 13", "x:"},
+		{"one of several send payload values", "x = 14", "x:"},
+		{"raise payload", "x = 15", "x:"},
+		{"announce payload", "x = 16", "x:"},
+		{"new statement", "x = 17", "x:"},
+		{"new expression", "x = 18", "x:"},
+		{"new with a named entry function", "x = 19", "x:"},
+		{"goto payload", "x = 20", "x:"},
+		{"field not in the type", "z = 21", ""},
+		{"return from an event handler", "x = 22", ""},
+		{"value assigned to a primitive", "x = 23", ""},
+		{"sequence insert", "x = 24", "x:"},
+		{"map insert value", "x = 25", "x:"},
+		{"map insert key", "x = 26", "x:"},
+		{"set add", "x = 27", "x:"},
+		{"set remove", "x = 28", "x:"},
+		{"map remove", "x = 29", "x:"},
+		{"in a set", "x = 30", "x:"},
+		{"map index assignment target", "x = 31", "x:"},
+		{"map index", "x = 32", "x:"},
+		{"in a map", "x = 33", "x:"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := Definition([]*Document{doc}, doc, at(t, tupleValueSource, tt.cursor, 1, 0))
+			if tt.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("got %+v, want no definition", got)
+				}
+				return
+			}
+			if want := at(t, tupleValueSource, tt.want, 1, 0); len(got) != 1 || got[0].Range.Start != want {
 				t.Fatalf("got %+v, want one definition at %+v", got, want)
 			}
 		})
