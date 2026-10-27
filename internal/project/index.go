@@ -49,6 +49,16 @@ func (x *Index) Projects() []string {
 	return paths
 }
 
+// Owners returns the .pproj files that list file directly, sorted.
+func (x *Index) Owners(file string) []string {
+	var paths []string
+	for _, p := range x.owners[file] {
+		paths = append(paths, p.Path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
 // Files returns every .p file in every loaded project, sorted.
 func (x *Index) Files() []string {
 	files := make([]string, 0, len(x.owners))

@@ -96,6 +96,12 @@ func TestVisible(t *testing.T) {
 	if _, ok := x.Errors[filepath.Join(root, "Common/Missing/Missing.pproj")]; !ok || len(x.Errors) != 1 {
 		t.Errorf("Errors = %v, want only the missing include", x.Errors)
 	}
+	if got, want := x.Owners(filepath.Join(root, "Common/Timer/PSrc/Timer.p")), paths(root, "Common/Timer/Timer.pproj"); !reflect.DeepEqual(got, want) {
+		t.Errorf("Owners(Timer.p) = %v, want only the project that lists it, %v", got, want)
+	}
+	if got := x.Owners(filepath.Join(root, "App/fixed_responses/Stray.p")); len(got) != 0 {
+		t.Errorf("Owners(Stray.p) = %v, want none", got)
+	}
 	wantProjects := paths(root, "App/App.pproj", "Common/Cycle/Cycle.pproj", "Common/Timer/Timer.pproj", "Common/Unrelated/Unrelated.pproj")
 	if got := x.Projects(); !reflect.DeepEqual(got, wantProjects) {
 		t.Errorf("Projects = %v\nwant %v", got, wantProjects)

@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/bencornia/p-lsp/internal/compile"
 	"github.com/bencornia/p-lsp/internal/project"
 	"github.com/tliron/commonlog"
 	"github.com/tliron/glsp"
@@ -46,6 +47,12 @@ type Server struct {
 	// pendingWatchers holds the latest watchers for registerWatchers to
 	// register; see queueWatchers.
 	pendingWatchers chan []fileSystemWatcher
+
+	// compiler type-checks projects on save; nil when p isn't available.
+	compiler *compile.Runner
+	// compileDiagnostics holds each project's last type-check diagnostics,
+	// by project and then by file path.
+	compileDiagnostics map[string]map[string][]protocol.Diagnostic
 }
 
 func New(version string) *Server {
@@ -64,6 +71,7 @@ func New(version string) *Server {
 		TextDocumentDidOpen:            s.didOpen,
 		TextDocumentDidChange:          s.didChange,
 		TextDocumentDidClose:           s.didClose,
+		TextDocumentDidSave:            s.didSave,
 		TextDocumentDocumentSymbol:     s.documentSymbol,
 		TextDocumentDefinition:         s.definition,
 		TextDocumentReferences:         s.references,
@@ -159,12 +167,14 @@ func (s *Server) didClose(ctx *glsp.Context, params *protocol.DidCloseTextDocume
 	if !s.loadFromDisk(path) {
 		s.remove(path)
 	}
+	// Syntax errors go with the editor's copy; type errors from the last
+	// compile stay until the next one.
+	diagnostics := s.diagnosticsFor(path)
 	s.mu.Unlock()
 
-	// Clear diagnostics so they don't linger after the file is closed.
 	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
 		URI:         uri,
-		Diagnostics: []protocol.Diagnostic{},
+		Diagnostics: diagnostics,
 	})
 	return nil
 }
@@ -277,7 +287,7 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 	doc := analysis.Parse(s.parser, uri, version, text)
 	s.replace(path, doc)
 	s.open[path] = true
-	diagnostics := analysis.SyntaxDiagnostics(doc)
+	diagnostics := s.diagnosticsFor(path)
 	s.mu.Unlock()
 
 	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{

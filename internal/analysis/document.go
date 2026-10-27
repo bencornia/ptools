@@ -95,6 +95,20 @@ func (d *Document) Point(pos protocol.Position) sitter.Point {
 	return sitter.Point{Row: uint(row), Column: uint(offset - start)}
 }
 
+// WordRange returns the range of the token at pos, such as a name or keyword,
+// or of the single character there if there's no token, for underlining an
+// error the compiler reported at a position.
+func (d *Document) WordRange(pos protocol.Position) protocol.Range {
+	point := d.Point(pos)
+	if n := d.Tree.RootNode().DescendantForPointRange(point, point); n != nil && n.ChildCount() == 0 &&
+		n.StartPosition() == point && n.EndByte() > n.StartByte() {
+		return d.Range(n)
+	}
+	end := pos
+	end.Character++
+	return protocol.Range{Start: pos, End: end}
+}
+
 // Range returns the LSP range covered by a node.
 func (d *Document) Range(n *sitter.Node) protocol.Range {
 	return protocol.Range{

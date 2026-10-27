@@ -24,6 +24,24 @@ reuse a stale cached parser.
 The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 `*.p` files. Logs go to stderr; pass `-v 2` for more of them.
 
+Saving a file that's listed in a `.pproj` type-checks its project with the
+[P compiler](https://p-org.github.io/P/getstarted/install/), and its errors
+appear alongside syntax errors. This needs `p` on your `PATH`; otherwise it's
+off, and the log says so. To use a different command, pass
+`-compiler "<command>"`, or `-compiler ""` to turn it off. Generated code goes
+to a temporary directory, not your project.
+
+`p` is a .NET tool, so if you installed .NET in your home directory, the
+environment your editor starts the server in needs it too:
+
+```sh
+export DOTNET_ROOT="$HOME/.dotnet"
+export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
+```
+
+P 3.1.0 stops at the first type error, so errors are reported one at a time;
+newer compilers report them all at once.
+
 ## TODO
 
 ### Server features
@@ -43,7 +61,8 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 - [x] Hover: a symbol's signature, doc comment, and file if declared elsewhere
 - [x] Rename, refusing renames that collide with or capture another name
 - [x] Workspace symbol search, with fuzzy matching
-- [ ] Type-check diagnostics from `p compile` on save
+- [x] Type-check diagnostics from `p compile` on save
+- [x] Verify type-check diagnostics against the real P compiler (P 3.1.0)
 - [ ] Completion of names in scope
 - [ ] Semantic tokens
 - [ ] Folding and selection ranges
