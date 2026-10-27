@@ -12,8 +12,8 @@ import (
 // declare each, with a payload type guessed from how it's used.
 func undefinedEventFixes(workspace []*Document, doc *Document) []Fix {
 	fixes := []Fix{}
-	walkNodes(doc.Tree.RootNode(), func(n *sitter.Node) bool {
-		event := eventReference(n)
+	doc.walk(func(n *sitter.Node) bool {
+		event := eventReference(doc, n)
 		if event == nil || len(resolve(workspace, doc, event)) > 0 {
 			return true
 		}
@@ -43,7 +43,7 @@ func undefinedEventFixes(workspace []*Document, doc *Document) []Fix {
 func eventDeclarations(workspace []*Document) []declaration {
 	events := []declaration{}
 	for _, d := range globalDeclarationsIn(workspace, nsValue) {
-		if kind := d.node.Parent().Kind(); kind == "event_declaration" || kind == "event_set_declaration" {
+		if kind := d.parent().Kind(); kind == "event_declaration" || kind == "event_set_declaration" {
 			events = append(events, d)
 		}
 	}
@@ -54,11 +54,11 @@ func eventDeclarations(workspace []*Document) []declaration {
 // event goes: in `on`, `case`, `defer`, `ignore`, `receives`, `sends`,
 // `observes` and event set lists, or the event of a `send`, `raise` or
 // `announce`.
-func eventReference(n *sitter.Node) *sitter.Node {
+func eventReference(doc *Document, n *sitter.Node) *sitter.Node {
 	if n.Kind() != "identifier" {
 		return nil
 	}
-	parent := n.Parent()
+	parent := doc.parent(n)
 	switch parent.Kind() {
 	case "event_id", "non_default_event":
 		return n
@@ -174,7 +174,7 @@ func expressionTypeText(workspace []*Document, doc *Document, expr *sitter.Node)
 // declaredTypeText returns the type a variable or parameter is declared
 // with, as written.
 func declaredTypeText(d declaration) (string, bool) {
-	decl := d.node.Parent()
+	decl := d.parent()
 	switch decl.Kind() {
 	case "function_param":
 		return paramTypeText(d.doc, decl)

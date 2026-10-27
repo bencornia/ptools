@@ -141,7 +141,7 @@ func renamingsFor(t declaration, cursorText, newName string) ([]renaming, error)
 
 	renamings := []renaming{{target: t, newRef: newName, newDecl: newName, includeDeclaration: true}}
 	// A Lemma or Theorem: references to its invariants spell its name too.
-	if group := t.node.Parent(); group.Kind() == "invariant_group_declaration" {
+	if group := t.parent(); group.Kind() == "invariant_group_declaration" {
 		for _, member := range invariantGroupDeclarations(t.doc, group)[1:] {
 			memberText := member.node.Utf8Text(member.doc.Text)
 			renamings = append(renamings, renaming{target: member, newRef: newName + "_" + memberText})
@@ -155,10 +155,10 @@ func renamingsFor(t declaration, cursorText, newName string) ([]renaming, error)
 func checkConflicts(candidates []*Document, workspaceOf func(*Document) []*Document, r renaming) error {
 	t := r.target
 	workspace := workspaceOf(t.doc)
-	ns := namespaceOf(t.node)
+	ns := namespaceOf(t.doc, t.node)
 
 	// A tuple field only has to differ from the other fields of its tuple.
-	if field := t.node.Parent(); field.Kind() == "identifier_type" {
+	if field := t.parent(); field.Kind() == "identifier_type" {
 		for _, sibling := range namedChildren(field.Parent()) {
 			if name := sibling.ChildByFieldName("name"); name != nil && !sameNode(name, t.node) && name.Utf8Text(t.doc.Text) == r.newDecl {
 				return fmt.Errorf("this tuple already has a field named %s", r.newDecl)
@@ -188,7 +188,7 @@ func checkConflicts(candidates []*Document, workspaceOf func(*Document) []*Docum
 	// A reference captured by a closer declaration of the new name, as when
 	// a function has its own local with that name.
 	for _, ref := range referencesTo(candidates, workspaceOf, []declaration{t}, false) {
-		for s := ref.node.Parent(); s != nil; s = s.Parent() {
+		for s := ref.doc.parent(ref.node); s != nil; s = s.Parent() {
 			decls := declarationsOf(ref.doc, scopeDeclarations(s, ns))
 			if slices.ContainsFunc(decls, func(d declaration) bool { return sameNode(d.node, t.node) }) {
 				break
@@ -205,7 +205,7 @@ func checkConflicts(candidates []*Document, workspaceOf func(*Document) []*Docum
 		var captured *sitter.Node
 		forEachIdentifier(scope, func(n *sitter.Node) {
 			// Tuple fields and names in other namespaces can't be captured.
-			if captured != nil || n.Utf8Text(t.doc.Text) != r.newRef || isFieldName(n) || namespaceOf(n) != ns {
+			if captured != nil || n.Utf8Text(t.doc.Text) != r.newRef || isFieldName(t.doc, n) || namespaceOf(t.doc, n) != ns {
 				return
 			}
 			for _, d := range resolve(workspace, t.doc, n) {
@@ -225,7 +225,7 @@ func checkConflicts(candidates []*Document, workspaceOf func(*Document) []*Docum
 // declaringScope returns the scope node that declares t (a function,
 // handler, quantifier or machine), or nil for a top-level declaration.
 func declaringScope(t declaration, ns namespace) *sitter.Node {
-	for s := t.node.Parent(); s != nil; s = s.Parent() {
+	for s := t.parent(); s != nil; s = s.Parent() {
 		for _, n := range scopeDeclarations(s, ns) {
 			if sameNode(n, t.node) {
 				return s

@@ -53,7 +53,7 @@ func Hover(workspace []*Document, doc *Document, pos protocol.Position) *protoco
 // signature renders a declaration as P source: the whole declaration when
 // it's short by nature, or its header without a body.
 func signature(d declaration) string {
-	decl := d.node.Parent()
+	decl := d.parent()
 	text := func(n *sitter.Node) string { return n.Utf8Text(d.doc.Text) }
 
 	switch decl.Kind() {

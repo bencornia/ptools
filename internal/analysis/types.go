@@ -35,7 +35,7 @@ const maxAliasDepth = 32
 func resolveField(workspace []*Document, doc *Document, access, field *sitter.Node) []declaration {
 	name := field.Utf8Text(doc.Text)
 	if spec, ok := specReference(workspace, doc, access.NamedChild(0)); ok {
-		if v, ok := machineVariable(spec.doc, spec.node.Parent(), name); ok {
+		if v, ok := machineVariable(spec.doc, spec.parent(), name); ok {
 			return []declaration{v}
 		}
 		return nil
@@ -60,7 +60,7 @@ func specReference(workspace []*Document, doc *Document, expr *sitter.Node) (dec
 	if expr == nil || expr.Kind() != "identifier" {
 		return declaration{}, false
 	}
-	if decls := resolve(workspace, doc, expr); len(decls) == 1 && decls[0].node.Parent().Kind() == "spec_machine_declaration" {
+	if decls := resolve(workspace, doc, expr); len(decls) == 1 && decls[0].parent().Kind() == "spec_machine_declaration" {
 		return decls[0], true
 	}
 	return declaration{}, false
@@ -69,7 +69,7 @@ func specReference(workspace []*Document, doc *Document, expr *sitter.Node) (dec
 // resolveValueField resolves a field name in a tuple value, as in
 // `(source = this, amount = 1)`, through the type its context expects.
 func resolveValueField(workspace []*Document, doc *Document, body, field *sitter.Node) []declaration {
-	t, ok := expectedType(workspace, doc, body.Parent())
+	t, ok := expectedType(workspace, doc, doc.parent(body))
 	if !ok {
 		return nil
 	}
@@ -85,10 +85,10 @@ func resolveValueField(workspace []*Document, doc *Document, body, field *sitter
 // enclosing tuple's field.
 func expectedType(workspace []*Document, doc *Document, value *sitter.Node) (typeRef, bool) {
 	node := value
-	if p := node.Parent(); p != nil && p.Kind() == "rvalue" {
+	if p := doc.parent(node); p != nil && p.Kind() == "rvalue" {
 		node = p
 	}
-	context := node.Parent()
+	context := doc.parent(node)
 	if context == nil {
 		return typeRef{}, false
 	}
@@ -97,7 +97,7 @@ func expectedType(workspace []*Document, doc *Document, value *sitter.Node) (typ
 	case "assign_statement":
 		return typeOf(workspace, doc, context.NamedChild(0))
 	case "return_statement":
-		for fn := context.Parent(); fn != nil; fn = fn.Parent() {
+		for fn := doc.parent(context); fn != nil; fn = doc.parent(fn) {
 			switch fn.Kind() {
 			case "p_function_declaration":
 				if name := fn.ChildByFieldName("name"); name != nil {
@@ -113,7 +113,7 @@ func expectedType(workspace []*Document, doc *Document, value *sitter.Node) (typ
 		return argumentType(workspace, doc, context, node)
 	case "named_tuple_body":
 		// The value of field f: the identifier just before it names f.
-		outer, ok := expectedType(workspace, doc, context.Parent())
+		outer, ok := expectedType(workspace, doc, doc.parent(context))
 		if !ok {
 			return typeRef{}, false
 		}
@@ -128,7 +128,7 @@ func expectedType(workspace []*Document, doc *Document, value *sitter.Node) (typ
 			prev = child
 		}
 	case "unnamed_tuple_body":
-		outer, ok := expectedType(workspace, doc, context.Parent())
+		outer, ok := expectedType(workspace, doc, doc.parent(context))
 		if !ok {
 			return typeRef{}, false
 		}
@@ -237,7 +237,7 @@ func callParameters(fn *sitter.Node) []*sitter.Node {
 // or new.
 func argumentType(workspace []*Document, doc *Document, list, arg *sitter.Node) (typeRef, bool) {
 	i, n := indexOf(list, arg), int(list.NamedChildCount())
-	statement := list.Parent()
+	statement := doc.parent(list)
 	var payload typeRef
 	var ok bool
 
@@ -248,7 +248,7 @@ func argumentType(workspace []*Document, doc *Document, list, arg *sitter.Node) 
 			fun = statement.NamedChild(0)
 		}
 		if decls := resolve(workspace, doc, fun); len(decls) == 1 {
-			if params := callParameters(decls[0].node.Parent()); i < len(params) {
+			if params := callParameters(decls[0].parent()); i < len(params) {
 				return declaredType(declaration{doc: decls[0].doc, node: params[i]})
 			}
 		}
@@ -263,7 +263,7 @@ func argumentType(workspace []*Document, doc *Document, list, arg *sitter.Node) 
 	case "goto_statement":
 		if name := firstChildOfKind(statement, "state_name"); name != nil {
 			if decls := resolve(workspace, doc, name.ChildByFieldName("state")); len(decls) == 1 {
-				payload, ok = entryPayload(workspace, decls[0].doc, decls[0].node.Parent())
+				payload, ok = entryPayload(workspace, decls[0].doc, decls[0].parent())
 			}
 		}
 	case "ctor_expression", "ctor_statement":
@@ -309,16 +309,16 @@ func eventPayload(workspace []*Document, doc *Document, event *sitter.Node) (typ
 		return typeRef{}, false
 	}
 	decls := resolve(workspace, doc, event)
-	if len(decls) != 1 || decls[0].node.Parent().Kind() != "event_declaration" {
+	if len(decls) != 1 || decls[0].parent().Kind() != "event_declaration" {
 		return typeRef{}, false
 	}
-	return typeChild(decls[0].doc, decls[0].node.Parent())
+	return typeChild(decls[0].doc, decls[0].parent())
 }
 
 // startPayload returns the entry parameter type of a machine's start state,
 // which is what `new M(payload)` passes its payload to.
 func startPayload(workspace []*Document, machine declaration) (typeRef, bool) {
-	body := machineBody(machine.node.Parent())
+	body := machineBody(machine.parent())
 	if body == nil {
 		return typeRef{}, false
 	}
@@ -348,7 +348,7 @@ func entryPayload(workspace []*Document, doc *Document, state *sitter.Node) (typ
 	}
 	if entry := firstChildOfKind(state, "state_entry_fun"); entry != nil {
 		if decls := resolve(workspace, doc, entry.ChildByFieldName("function_name")); len(decls) == 1 {
-			if params := callParameters(decls[0].node.Parent()); len(params) > 0 {
+			if params := callParameters(decls[0].parent()); len(params) > 0 {
 				return declaredType(declaration{doc: decls[0].doc, node: params[0]})
 			}
 		}
@@ -497,14 +497,14 @@ func verifierFields(workspace []*Document, typeName string) []declaration {
 	globals := globalDeclarationsIn(workspace, nsValue)
 	fields := []declaration{}
 	for _, d := range named(globals, typeName) {
-		switch decl := d.node.Parent(); decl.Kind() {
+		switch decl := d.parent(); decl.Kind() {
 		case "impl_machine_declaration", "spec_machine_declaration", "scenario_machine_declaration":
 			fields = append(fields, machineVariables(d.doc, decl)...)
 		case "interface_declaration":
 			// The compiler uses the machine with the interface's name.
 			for _, m := range named(globals, typeName) {
-				if machineBody(m.node.Parent()) != nil {
-					fields = append(fields, machineVariables(m.doc, m.node.Parent())...)
+				if machineBody(m.parent()) != nil {
+					fields = append(fields, machineVariables(m.doc, m.parent())...)
 				}
 			}
 		case "event_declaration":
@@ -540,7 +540,7 @@ func machineVariable(doc *Document, machine *sitter.Node, name string) (declarat
 func machineVariables(doc *Document, machine *sitter.Node) []declaration {
 	vars := []declaration{}
 	for _, d := range declarationsOf(doc, machineMembers(machineBody(machine), nsValue)) {
-		if d.node.Parent().Kind() == "identifier_list" {
+		if d.parent().Kind() == "identifier_list" {
 			vars = append(vars, d)
 		}
 	}
@@ -560,7 +560,7 @@ func underlying(workspace []*Document, t typeRef) (typeRef, bool) {
 		}
 		var aliases []declaration
 		for _, d := range named(globalDeclarationsIn(workspace, nsValue), name.Utf8Text(t.doc.Text)) {
-			if d.node.Parent().Kind() == "p_type_def" {
+			if d.parent().Kind() == "p_type_def" {
 				aliases = append(aliases, d)
 			}
 		}
@@ -569,7 +569,7 @@ func underlying(workspace []*Document, t typeRef) (typeRef, bool) {
 			return t, true
 		case 1:
 			var ok bool
-			if t, ok = typeChild(aliases[0].doc, aliases[0].node.Parent()); !ok {
+			if t, ok = typeChild(aliases[0].doc, aliases[0].parent()); !ok {
 				return typeRef{}, false
 			}
 		default:
@@ -582,9 +582,9 @@ func underlying(workspace []*Document, t typeRef) (typeRef, bool) {
 // declaredType returns the type a variable, parameter or field is declared
 // with: `var x: T`, `(x: T)` or `(name: T)` in a named tuple type.
 func declaredType(d declaration) (typeRef, bool) {
-	decl := d.node.Parent()
+	decl := d.parent()
 	if decl.Kind() == "identifier_list" {
-		decl = decl.Parent()
+		decl = d.doc.parent(decl)
 	}
 	switch decl.Kind() {
 	case "var_declaration", "function_param", "identifier_type":
@@ -595,7 +595,7 @@ func declaredType(d declaration) (typeRef, bool) {
 
 // returnType returns the return type of the function a declaration names.
 func returnType(d declaration) (typeRef, bool) {
-	fn := d.node.Parent()
+	fn := d.parent()
 	switch fn.Kind() {
 	case "p_function_declaration", "pure_declaration":
 		return typeChild(d.doc, fn)

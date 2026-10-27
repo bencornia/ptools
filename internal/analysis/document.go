@@ -43,6 +43,59 @@ type Document struct {
 	// scopes caches the declarations in each scope it's asked about.
 	scopesMu sync.Mutex
 	scopes   map[scopeKey][]declaration
+
+	// parents caches each node's parent; see parent.
+	parentsMu sync.Mutex
+	parents   map[uintptr]*sitter.Node
+}
+
+// walk calls visit on the nodes of d's tree depth first, skipping the
+// children of nodes visit returns false for, and caches each node's parent
+// on the way down, which saves parent searching for it.
+func (d *Document) walk(visit func(*sitter.Node) bool) {
+	var walk func(n *sitter.Node)
+	walk = func(n *sitter.Node) {
+		if !visit(n) {
+			return
+		}
+		count := n.ChildCount()
+		if count == 0 {
+			return
+		}
+		children := make([]*sitter.Node, count)
+		d.parentsMu.Lock()
+		if d.parents == nil {
+			d.parents = map[uintptr]*sitter.Node{}
+		}
+		for i := range count {
+			children[i] = n.Child(i)
+			d.parents[children[i].Id()] = n
+		}
+		d.parentsMu.Unlock()
+		for _, c := range children {
+			walk(c)
+		}
+	}
+	walk(d.Tree.RootNode())
+}
+
+// parent returns n's parent, n being a node of d's tree. Tree-sitter finds a
+// node's parent by searching down from the root, so walking up from a node
+// costs time proportional to the square of its depth; name resolution does
+// that for every name, and ancestors are shared, so they're cached.
+func (d *Document) parent(n *sitter.Node) *sitter.Node {
+	d.parentsMu.Lock()
+	defer d.parentsMu.Unlock()
+	id := n.Id()
+	if p, ok := d.parents[id]; ok {
+		return p
+	}
+	if d.parents == nil {
+		d.parents = map[uintptr]*sitter.Node{}
+	}
+	p := n.Parent()
+	d.parents[id] = p
+	return p
 }
 
 type scopeKey struct {

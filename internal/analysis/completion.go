@@ -57,9 +57,9 @@ func Completion(parser *sitter.Parser, workspace []*Document, doc *Document, pos
 	case isDeclaredName(workspace, edited, ident) || declaringKeywords[prevToken(ident)]:
 		// Naming something new.
 		return nil
-	case isFieldName(ident) && (parent.Kind() == "named_tuple_access_expression" || parent.Kind() == "named_tuple_lvalue"):
+	case isFieldName(edited, ident) && (parent.Kind() == "named_tuple_access_expression" || parent.Kind() == "named_tuple_lvalue"):
 		decls = fieldsAfter(workspace, edited, parent.NamedChild(0))
-	case isFieldName(ident) && parent.Kind() == "named_tuple_body" || parent.Kind() == "ERROR" && parent.Parent() != nil && parent.Parent().Kind() == "named_tuple_expression":
+	case isFieldName(edited, ident) && parent.Kind() == "named_tuple_body" || parent.Kind() == "ERROR" && parent.Parent() != nil && parent.Parent().Kind() == "named_tuple_expression":
 		// A field of a tuple value. After the first, as in
 		// `(source = this, `, the new field is an ERROR.
 		if t, ok := expectedType(workspace, edited, parent.Parent()); ok {
@@ -67,7 +67,7 @@ func Completion(parser *sitter.Parser, workspace []*Document, doc *Document, pos
 		}
 	default:
 		decls = namesInScope(workspace, edited, ident)
-		keywordsToo = namespaceOf(ident) == nsValue
+		keywordsToo = namespaceOf(edited, ident) == nsValue
 	}
 
 	items := []protocol.CompletionItem{}
@@ -112,16 +112,16 @@ func prevToken(node *sitter.Node) string {
 // namesInScope returns the declarations the name ident could refer to, in
 // its namespace, innermost first.
 func namesInScope(workspace []*Document, doc *Document, ident *sitter.Node) []declaration {
-	ns := namespaceOf(ident)
+	ns := namespaceOf(doc, ident)
 	decls := []declaration{}
-	for scope := ident.Parent(); scope != nil; scope = scope.Parent() {
+	for scope := doc.parent(ident); scope != nil; scope = doc.parent(scope) {
 		decls = append(decls, doc.scopeDeclarations(scope, ns)...)
 	}
 	if ns != nsState {
 		decls = append(decls, globalDeclarationsIn(workspace, ns)...)
 	}
-	if isTestedKind(ident) {
-		decls = append(decls, testedStates(workspace, doc, ident.Parent())...)
+	if isTestedKind(doc, ident) {
+		decls = append(decls, testedStates(workspace, doc, doc.parent(ident))...)
 	}
 	return decls
 }
@@ -139,7 +139,7 @@ func isDeclaredName(workspace []*Document, doc *Document, ident *sitter.Node) bo
 // fieldsAfter returns the fields that can follow `base.`.
 func fieldsAfter(workspace []*Document, doc *Document, base *sitter.Node) []declaration {
 	if spec, ok := specReference(workspace, doc, base); ok {
-		return machineVariables(spec.doc, spec.node.Parent())
+		return machineVariables(spec.doc, spec.parent())
 	}
 	if t, ok := typeOf(workspace, doc, base); ok {
 		return fieldsOf(workspace, t)
@@ -149,7 +149,7 @@ func fieldsAfter(workspace []*Document, doc *Document, base *sitter.Node) []decl
 
 func completionItem(d declaration) protocol.CompletionItem {
 	kind := protocol.CompletionItemKindVariable
-	switch decl := d.node.Parent(); decl.Kind() {
+	switch decl := d.parent(); decl.Kind() {
 	case "identifier_list":
 		if owner := decl.Parent(); owner.Parent() != nil && owner.Parent().Kind() == "machine_entry" {
 			kind = protocol.CompletionItemKindField

@@ -27,6 +27,12 @@ type declaration struct {
 	name string
 }
 
+// parent returns the node that declares d, such as a var_declaration's
+// identifier_list or an event_declaration.
+func (d declaration) parent() *sitter.Node {
+	return d.doc.parent(d.node)
+}
+
 // Definition returns where the identifier at pos in doc is declared. It
 // searches the enclosing function and machine first, then the top-level
 // declarations of every document in workspace (which should include doc).
@@ -47,13 +53,13 @@ func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declara
 		// A name tree-sitter's error recovery left out.
 		return nil
 	}
-	if isFieldName(ident) {
+	if isFieldName(doc, ident) {
 		return resolveFieldName(workspace, doc, ident)
 	}
-	if isGroupedInvariantName(ident) {
+	if isGroupedInvariantName(doc, ident) {
 		// References spell it <group>_<name>, so it can't be looked up by
 		// its own text.
-		for _, d := range invariantGroupDeclarations(doc, ident.Parent().Parent()) {
+		for _, d := range invariantGroupDeclarations(doc, doc.parent(doc.parent(ident))) {
 			if sameNode(d.node, ident) {
 				return []declaration{d}
 			}
@@ -61,9 +67,9 @@ func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declara
 		return nil
 	}
 	name := ident.Utf8Text(doc.Text)
-	ns := namespaceOf(ident)
+	ns := namespaceOf(doc, ident)
 
-	for scope := ident.Parent(); scope != nil; scope = scope.Parent() {
+	for scope := doc.parent(ident); scope != nil; scope = doc.parent(scope) {
 		if found := named(doc.scopeDeclarations(scope, ns), name); len(found) > 0 {
 			return found
 		}
@@ -73,21 +79,24 @@ func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declara
 	}
 
 	found := named(globalDeclarationsIn(workspace, ns), name)
-	if len(found) == 0 && isTestedKind(ident) {
+	if len(found) == 0 && isTestedKind(doc, ident) {
 		// `x is S` also tests which state machine x is in.
-		found = named(testedStates(workspace, doc, ident.Parent()), name)
+		found = named(testedStates(workspace, doc, doc.parent(ident)), name)
 	}
 	return found
 }
 
-func isGroupedInvariantName(ident *sitter.Node) bool {
-	inv := ident.Parent()
-	return inv.Kind() == "invariant_declaration" && sameNode(inv.ChildByFieldName("name"), ident) &&
-		inv.Parent() != nil && inv.Parent().Kind() == "invariant_group_declaration"
+func isGroupedInvariantName(doc *Document, ident *sitter.Node) bool {
+	inv := doc.parent(ident)
+	if inv.Kind() != "invariant_declaration" || !sameNode(inv.ChildByFieldName("name"), ident) {
+		return false
+	}
+	group := doc.parent(inv)
+	return group != nil && group.Kind() == "invariant_group_declaration"
 }
 
-func isTestedKind(ident *sitter.Node) bool {
-	parent := ident.Parent()
+func isTestedKind(doc *Document, ident *sitter.Node) bool {
+	parent := doc.parent(ident)
 	return parent.Kind() == "test_expression" && sameNode(parent.ChildByFieldName("kind"), ident)
 }
 
@@ -97,7 +106,7 @@ func isTestedKind(ident *sitter.Node) bool {
 func testedStates(workspace []*Document, doc *Document, test *sitter.Node) []declaration {
 	machines := []declaration{}
 	for _, d := range globalDeclarationsIn(workspace, nsValue) {
-		if machineBody(d.node.Parent()) != nil {
+		if machineBody(d.parent()) != nil {
 			machines = append(machines, d)
 		}
 	}
@@ -112,7 +121,7 @@ func testedStates(workspace []*Document, doc *Document, test *sitter.Node) []dec
 
 	states := []declaration{}
 	for _, m := range machines {
-		body := machineBody(m.node.Parent())
+		body := machineBody(m.parent())
 		states = append(states, declarationsOf(m.doc, machineMembers(body, nsState))...)
 	}
 	return states
@@ -151,8 +160,8 @@ func identifierAt(doc *Document, pos protocol.Position) *sitter.Node {
 
 // isFieldName reports whether ident names a tuple field, which is resolved
 // through types rather than scopes.
-func isFieldName(ident *sitter.Node) bool {
-	parent := ident.Parent()
+func isFieldName(doc *Document, ident *sitter.Node) bool {
+	parent := doc.parent(ident)
 	switch parent.Kind() {
 	case "named_tuple_access_expression":
 		return sameNode(parent.ChildByFieldName("field"), ident)
@@ -166,7 +175,7 @@ func isFieldName(ident *sitter.Node) bool {
 }
 
 func resolveFieldName(workspace []*Document, doc *Document, ident *sitter.Node) []declaration {
-	parent := ident.Parent()
+	parent := doc.parent(ident)
 	switch parent.Kind() {
 	case "named_tuple_access_expression", "named_tuple_lvalue":
 		return resolveField(workspace, doc, parent, ident)
@@ -180,8 +189,8 @@ func resolveFieldName(workspace []*Document, doc *Document, ident *sitter.Node) 
 	return nil
 }
 
-func namespaceOf(ident *sitter.Node) namespace {
-	parent := ident.Parent()
+func namespaceOf(doc *Document, ident *sitter.Node) namespace {
+	parent := doc.parent(ident)
 	switch parent.Kind() {
 	case "state_name":
 		return nsState

@@ -175,7 +175,7 @@ func calleeSignature(workspace []*Document, doc *Document, c call) *protocol.Sig
 	var decl declaration
 	found := false
 	for _, d := range lookupName(workspace, doc, c.callee) {
-		kind := d.node.Parent().Kind()
+		kind := d.parent().Kind()
 		if c.isNew && slices.Contains(machineKinds, kind) || !c.isNew && slices.Contains(functionKinds, kind) {
 			decl, found = d, true
 			break
@@ -187,7 +187,7 @@ func calleeSignature(workspace []*Document, doc *Document, c call) *protocol.Sig
 
 	var label string
 	var params []string
-	switch fn := decl.node.Parent(); fn.Kind() {
+	switch fn := decl.parent(); fn.Kind() {
 	case "interface_declaration":
 		label = "new " + name + "("
 		if t, ok := typeChildText(decl.doc, fn); ok {
@@ -280,10 +280,10 @@ func eventSignature(workspace []*Document, doc *Document, c call) *protocol.Sign
 		return nil
 	}
 	for _, d := range lookupName(workspace, doc, event) {
-		if d.node.Parent().Kind() != "event_declaration" {
+		if d.parent().Kind() != "event_declaration" {
 			continue
 		}
-		payload, ok := typeChildText(d.doc, d.node.Parent())
+		payload, ok := typeChildText(d.doc, d.parent())
 		if !ok {
 			payload = "no payload"
 		}

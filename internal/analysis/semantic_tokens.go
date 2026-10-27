@@ -71,10 +71,9 @@ func SemanticTokens(workspace []*Document, doc *Document, rng *protocol.Range) [
 	}
 
 	e := tokenEncoder{doc: doc}
-	var walk func(n *sitter.Node)
-	walk = func(n *sitter.Node) {
+	doc.walk(func(n *sitter.Node) bool {
 		if n.EndByte() <= start || n.StartByte() >= end {
-			return
+			return false
 		}
 		switch kind := n.Kind(); {
 		case kind == "comment":
@@ -89,18 +88,16 @@ func SemanticTokens(workspace []*Document, doc *Document, rng *protocol.Range) [
 				e.add(n, token, modifiers)
 			}
 		case n.ChildCount() == 0 && !n.IsNamed() && keywords[kind]:
-			if builtinTypes[kind] && isTypePosition(n) {
+			if builtinTypes[kind] && isTypePosition(doc, n) {
 				e.add(n, tokenType, 0)
 			} else {
 				e.add(n, tokenKeyword, 0)
 			}
 		default:
-			for i := uint(0); i < n.ChildCount(); i++ {
-				walk(n.Child(i))
-			}
+			return true
 		}
-	}
-	walk(doc.Tree.RootNode())
+		return false
+	})
 	return e.data
 }
 
@@ -115,10 +112,10 @@ func identifierToken(workspace []*Document, doc *Document, ident *sitter.Node) (
 		modifiers = modifierDeclaration
 	}
 
-	switch decl := d.node.Parent(); decl.Kind() {
+	switch decl := d.parent(); decl.Kind() {
 	case "identifier_list":
 		// `var` in a machine, function or handler, or a global `param`.
-		if owner := decl.Parent(); owner.Parent() != nil && owner.Parent().Kind() == "machine_entry" {
+		if owner := d.doc.parent(decl); d.doc.parent(owner) != nil && d.doc.parent(owner).Kind() == "machine_entry" {
 			return tokenProperty, modifiers, true
 		}
 		return tokenVariable, modifiers, true
@@ -139,8 +136,8 @@ func identifierToken(workspace []*Document, doc *Document, ident *sitter.Node) (
 // isTypePosition reports whether a builtin type keyword is used as a type,
 // as in `var m: machine` or `map[int, machine]`, rather than starting a
 // declaration such as `machine M {`.
-func isTypePosition(keyword *sitter.Node) bool {
-	if typeKinds[keyword.Parent().Kind()] {
+func isTypePosition(doc *Document, keyword *sitter.Node) bool {
+	if typeKinds[doc.parent(keyword).Kind()] {
 		return true
 	}
 	prev := keyword.PrevSibling()

@@ -19,18 +19,18 @@ const maxSuggestions = 3
 // declare them.
 func undefinedNameFixes(workspace []*Document, doc *Document) []Fix {
 	fixes := []Fix{}
-	walkNodes(doc.Tree.RootNode(), func(n *sitter.Node) bool {
+	doc.walk(func(n *sitter.Node) bool {
 		if n.IsError() {
 			// Already reported as a syntax error.
 			return false
 		}
-		if n.Kind() != "identifier" || eventReference(n) != nil {
+		if n.Kind() != "identifier" || eventReference(doc, n) != nil {
 			return true
 		}
 		name := n.Utf8Text(doc.Text)
 		var message string
 		var candidates []declaration
-		if isFieldName(n) {
+		if isFieldName(doc, n) {
 			fields, typeName, ok := knownFields(workspace, doc, n)
 			if !ok || len(named(fields, name)) > 0 {
 				return true
@@ -43,14 +43,14 @@ func undefinedNameFixes(workspace []*Document, doc *Document) []Fix {
 				return true
 			}
 			kind := "name"
-			switch namespaceOf(n) {
+			switch namespaceOf(doc, n) {
 			case nsState:
 				kind = "state"
 			case nsModule:
 				kind = "module"
 			}
 			message = fmt.Sprintf("undefined %s `%s`", kind, name)
-			candidates = fitting(n, namesInScope(workspace, doc, n))
+			candidates = fitting(doc, n, namesInScope(workspace, doc, n))
 		}
 		fixes = append(fixes, renameFixes(doc, n, nameDiagnostic(doc, n, message), candidates)...)
 		return true
@@ -69,9 +69,9 @@ var (
 
 // fitting returns the candidates that could go where the name n is: only
 // types in a type, functions in a call, and machines after `new`.
-func fitting(n *sitter.Node, candidates []declaration) []declaration {
+func fitting(doc *Document, n *sitter.Node, candidates []declaration) []declaration {
 	var kinds []string
-	parent := n.Parent()
+	parent := doc.parent(n)
 	switch parent.Kind() {
 	case "named_type":
 		kinds = declaredTypeKinds
@@ -84,7 +84,7 @@ func fitting(n *sitter.Node, candidates []declaration) []declaration {
 	}
 	fit := []declaration{}
 	for _, c := range candidates {
-		if slices.Contains(kinds, c.node.Parent().Kind()) {
+		if slices.Contains(kinds, c.parent().Kind()) {
 			fit = append(fit, c)
 		}
 	}
@@ -96,13 +96,13 @@ func fitting(n *sitter.Node, candidates []declaration) []declaration {
 // named tuple or a spec machine. For anything else, such as a machine
 // whose variables only the verifier can read, it returns false.
 func knownFields(workspace []*Document, doc *Document, ident *sitter.Node) ([]declaration, string, bool) {
-	parent := ident.Parent()
+	parent := doc.parent(ident)
 	var t typeRef
 	switch parent.Kind() {
 	case "named_tuple_access_expression", "named_tuple_lvalue":
 		base := parent.NamedChild(0)
 		if spec, ok := specReference(workspace, doc, base); ok {
-			return machineVariables(spec.doc, spec.node.Parent()), spec.name, true
+			return machineVariables(spec.doc, spec.parent()), spec.name, true
 		}
 		var ok bool
 		if t, ok = typeOf(workspace, doc, base); !ok {
@@ -110,7 +110,7 @@ func knownFields(workspace []*Document, doc *Document, ident *sitter.Node) ([]de
 		}
 	case "named_tuple_body":
 		var ok bool
-		if t, ok = expectedType(workspace, doc, parent.Parent()); !ok {
+		if t, ok = expectedType(workspace, doc, doc.parent(parent)); !ok {
 			return nil, "", false
 		}
 	default:
