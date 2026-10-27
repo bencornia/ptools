@@ -52,7 +52,12 @@ func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declara
 	if isGroupedInvariantName(ident) {
 		// References spell it <group>_<name>, so it can't be looked up by
 		// its own text.
-		return declarationsOf(doc, []*sitter.Node{ident})
+		for _, d := range invariantGroupDeclarations(doc, ident.Parent().Parent()) {
+			if sameNode(d.node, ident) {
+				return []declaration{d}
+			}
+		}
+		return nil
 	}
 	name := ident.Utf8Text(doc.Text)
 	ns := namespaceOf(ident)

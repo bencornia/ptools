@@ -450,3 +450,31 @@ func TestFilesInWorkspaceDontSearchUpward(t *testing.T) {
 	open(t, s, root, "App/Stray/Stray.p")
 	assertDiscovered(t, s, root)
 }
+
+func TestReferencesStayInTheProject(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":       appProject,
+		"App/PSrc/Events.p":   "event eFoo;\n",
+		"App/PSrc/Main.p":     mainP,
+		"Other/Other.pproj":   appProject,
+		"Other/PSrc/Events.p": "event eFoo;\n",
+		"Other/PSrc/Main.p":   mainP,
+	}, client{})
+
+	locs, err := s.references(fakeContext(nil), &protocol.ReferenceParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: pathToURI(filepath.Join(root, "App/PSrc/Events.p"))},
+			Position:     protocol.Position{Line: 0, Character: 6},
+		},
+		Context: protocol.ReferenceContext{IncludeDeclaration: true},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, loc := range locs {
+		rel, _ := filepath.Rel(root, uriToPath(loc.URI))
+		got = append(got, rel+":"+itoa(int(loc.Range.Start.Line)+1))
+	}
+	assertDefinitions(t, got, "App/PSrc/Events.p:1", "App/PSrc/Main.p:3")
+}

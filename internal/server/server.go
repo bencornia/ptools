@@ -65,6 +65,7 @@ func New(version string) *Server {
 		TextDocumentDidClose:           s.didClose,
 		TextDocumentDocumentSymbol:     s.documentSymbol,
 		TextDocumentDefinition:         s.definition,
+		TextDocumentReferences:         s.references,
 		WorkspaceDidChangeWatchedFiles: s.didChangeWatchedFiles,
 	}
 	return s
@@ -180,6 +181,29 @@ func (s *Server) definition(_ *glsp.Context, params *protocol.DefinitionParams) 
 	return analysis.Definition(workspace, doc, params.Position), nil
 }
 
+func (s *Server) references(_ *glsp.Context, params *protocol.ReferenceParams) ([]protocol.Location, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil, nil
+	}
+
+	// Each document is resolved against the files it's compiled with, which
+	// are the same for every identifier in it.
+	workspaces := map[*analysis.Document][]*analysis.Document{}
+	workspaceOf := func(d *analysis.Document) []*analysis.Document {
+		if w, ok := workspaces[d]; ok {
+			return w
+		}
+		w := s.visibleDocs(key(d.URI))
+		workspaces[d] = w
+		return w
+	}
+	return analysis.References(s.allDocs(), workspaceOf, doc, params.Position, params.Context.IncludeDeclaration), nil
+}
+
 // update re-parses an open document and publishes its diagnostics.
 func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version protocol.Integer, text string) {
 	publishedVersion := protocol.UInteger(version)
@@ -205,10 +229,20 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 func (s *Server) visibleDocs(path string) []*analysis.Document {
 	paths, ok := s.projects.Visible(path)
 	if !ok {
-		paths = slices.Collect(maps.Keys(s.docs))
+		return s.allDocs()
 	}
-	slices.Sort(paths)
+	return s.docsAt(paths)
+}
 
+// allDocs returns every document, sorted by path. Callers must hold mu.
+func (s *Server) allDocs() []*analysis.Document {
+	return s.docsAt(slices.Collect(maps.Keys(s.docs)))
+}
+
+// docsAt returns the loaded documents at paths, sorted by path. Callers must
+// hold mu.
+func (s *Server) docsAt(paths []string) []*analysis.Document {
+	slices.Sort(paths)
 	docs := make([]*analysis.Document, 0, len(paths))
 	for _, p := range paths {
 		if doc, ok := s.docs[p]; ok {
