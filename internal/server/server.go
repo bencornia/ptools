@@ -33,6 +33,10 @@ type Server struct {
 	docs     map[string]*analysis.Document
 	open     map[string]bool
 	projects *project.Index
+	// roots are the workspace folders.
+	roots []string
+	// watchFiles is whether the client can watch files for us.
+	watchFiles bool
 }
 
 func New(version string) *Server {
@@ -44,13 +48,15 @@ func New(version string) *Server {
 		projects: project.NewIndex(),
 	}
 	s.handler = protocol.Handler{
-		Initialize:                 s.initialize,
-		Shutdown:                   s.shutdown,
-		TextDocumentDidOpen:        s.didOpen,
-		TextDocumentDidChange:      s.didChange,
-		TextDocumentDidClose:       s.didClose,
-		TextDocumentDocumentSymbol: s.documentSymbol,
-		TextDocumentDefinition:     s.definition,
+		Initialize:                     s.initialize,
+		Initialized:                    s.initialized,
+		Shutdown:                       s.shutdown,
+		TextDocumentDidOpen:            s.didOpen,
+		TextDocumentDidChange:          s.didChange,
+		TextDocumentDidClose:           s.didClose,
+		TextDocumentDocumentSymbol:     s.documentSymbol,
+		TextDocumentDefinition:         s.definition,
+		WorkspaceDidChangeWatchedFiles: s.didChangeWatchedFiles,
 	}
 	return s
 }
@@ -68,7 +74,15 @@ func (s *Server) initialize(_ *glsp.Context, params *protocol.InitializeParams) 
 	if len(roots) == 0 && params.RootURI != nil {
 		roots = append(roots, uriToPath(*params.RootURI))
 	}
-	s.loadWorkspace(roots)
+	workspace := params.Capabilities.Workspace
+	watchFiles := workspace != nil && workspace.DidChangeWatchedFiles != nil &&
+		workspace.DidChangeWatchedFiles.DynamicRegistration != nil && *workspace.DidChangeWatchedFiles.DynamicRegistration
+
+	s.mu.Lock()
+	s.roots = roots
+	s.watchFiles = watchFiles
+	s.reloadWorkspace()
+	s.mu.Unlock()
 
 	capabilities := s.handler.CreateServerCapabilities()
 
@@ -84,35 +98,6 @@ func (s *Server) initialize(_ *glsp.Context, params *protocol.InitializeParams) 
 			Version: &s.version,
 		},
 	}, nil
-}
-
-// loadWorkspace parses every P file under roots, and every file in the
-// projects they include, so that definitions in files the editor hasn't
-// opened can be found.
-func (s *Server) loadWorkspace(roots []string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	for _, root := range roots {
-		pFiles, projects, err := project.Find(root)
-		if err != nil {
-			log.Errorf("loading workspace %s: %s", root, err)
-		}
-		s.projects.Load(projects...)
-		for _, path := range pFiles {
-			s.loadFromDisk(path)
-		}
-		log.Infof("loaded %d P files and %d projects from %s", len(pFiles), len(projects), root)
-	}
-	// Included projects can live outside the workspace, as with the P
-	// tutorials' ../Common/Timer.
-	for _, path := range s.projects.Files() {
-		if _, loaded := s.docs[path]; !loaded {
-			s.loadFromDisk(path)
-		}
-	}
-	for path, err := range s.projects.Errors {
-		log.Errorf("reading project %s: %s", path, err)
-	}
 }
 
 func (s *Server) shutdown(_ *glsp.Context) error {

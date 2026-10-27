@@ -32,7 +32,8 @@ The server speaks LSP over stdin/stdout. Point your editor at `bin/p-lsp` for
 - [x] Document outline (`textDocument/documentSymbol`)
 - [x] Go to definition, across all `.p` files in the workspace
 - [x] Read `.pproj` files: follow `<IncludeProject>` and only index listed `<PFile>` paths
-- [ ] Reload `.pproj` files and newly created `.p` files when they change on disk
+- [x] Reload `.pproj` files and newly created `.p` files when they change on disk
+- [ ] Watch included projects outside the workspace (e.g. `../Common`) for changes
 - [ ] Find a file's `.pproj` by searching parent directories when it's opened outside the workspace
 - [ ] Go to definition for tuple fields (needs types)
 - [ ] Find references
