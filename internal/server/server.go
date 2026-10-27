@@ -35,6 +35,9 @@ type Server struct {
 	projects *project.Index
 	// roots are the workspace folders.
 	roots []string
+	// discovered are .pproj files found by searching upward from files
+	// opened outside the workspace; see discoverProject.
+	discovered []string
 	// watch describes what the client can watch for us.
 	watch watchSupport
 	// watchers are the file watchers last sent to registerWatchers.
@@ -116,6 +119,10 @@ func (s *Server) shutdown(_ *glsp.Context) error {
 func (s *Server) didOpen(ctx *glsp.Context, params *protocol.DidOpenTextDocumentParams) error {
 	item := params.TextDocument
 	s.update(ctx, item.URI, item.Version, item.Text)
+
+	s.mu.Lock()
+	s.discoverProject(key(item.URI))
+	s.mu.Unlock()
 	return nil
 }
 

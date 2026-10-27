@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -366,4 +367,86 @@ func TestOpenFileKeepsEditorText(t *testing.T) {
 		"App/App.pproj":    protocol.FileChangeTypeChanged,
 	})
 	assertDefinitions(t, definitionOf(t, s, root, "App/PSrc/Main.p", "eFoo"), "App/PSrc/Event.p:2")
+}
+
+func open(t *testing.T, s *Server, root, name string) {
+	t.Helper()
+	text, err := os.ReadFile(filepath.Join(root, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.didOpen(fakeContext(nil), &protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{
+		URI: pathToURI(filepath.Join(root, name)), LanguageID: "p", Version: 1, Text: string(text),
+	}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertDiscovered(t *testing.T, s *Server, root string, want ...string) {
+	t.Helper()
+	got := []string{}
+	for _, path := range s.discovered {
+		rel, _ := filepath.Rel(root, path)
+		got = append(got, rel)
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("discovered %v, want %v", got, want)
+	}
+}
+
+const otherMain = "machine A {\n  start state S {\n    on eBar do {}\n  }\n}\n"
+
+func TestOpenFileOutsideWorkspaceFindsItsProject(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":       appProject,
+		"App/PSrc/Main.p":     mainP,
+		"Other/Other.pproj":   appProject,
+		"Other/PSrc/A.p":      otherMain,
+		"Other/PSrc/Events.p": "event eBar;\n",
+	}, client{watch: true, relative: true, workspace: "App"})
+
+	open(t, s, root, "Other/PSrc/A.p")
+	assertDiscovered(t, s, root, "Other/Other.pproj")
+	assertDefinitions(t, definitionOf(t, s, root, "Other/PSrc/A.p", "eBar"), "Other/PSrc/Events.p:1")
+
+	// Rebuilding the workspace keeps the discovered project.
+	notify(t, s, root, map[string]protocol.UInteger{"App/App.pproj": protocol.FileChangeTypeChanged})
+	assertDefinitions(t, definitionOf(t, s, root, "Other/PSrc/A.p", "eBar"), "Other/PSrc/Events.p:1")
+
+	// And its directory is watched, like other projects outside the
+	// workspace.
+	if !slices.ContainsFunc(s.watchers, func(w fileSystemWatcher) bool {
+		rel, ok := w.GlobPattern.(relativePattern)
+		return ok && uriToPath(rel.BaseURI) == filepath.Join(root, "Other")
+	}) {
+		t.Errorf("Other isn't watched: %+v", s.watchers)
+	}
+}
+
+func TestDiscoverySkipsProjectsThatDontListTheFile(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":                appProject,
+		"Outer/Outer.pproj":            `<Project><InputFiles><PFile>./Inner/PSrc/</PFile></InputFiles></Project>`,
+		"Outer/Inner/Wrong.pproj":      `<Project><InputFiles><PFile>./Elsewhere/</PFile></InputFiles></Project>`,
+		"Outer/Inner/PSrc/A.p":         otherMain,
+		"Outer/Inner/PSrc/Events.p":    "event eBar;\n",
+		"Outer/Inner/Elsewhere/Else.p": "event eBar;\n",
+	}, client{workspace: "App"})
+
+	open(t, s, root, "Outer/Inner/PSrc/A.p")
+	assertDiscovered(t, s, root, "Outer/Outer.pproj")
+	assertDefinitions(t, definitionOf(t, s, root, "Outer/Inner/PSrc/A.p", "eBar"), "Outer/Inner/PSrc/Events.p:1")
+}
+
+func TestFilesInWorkspaceDontSearchUpward(t *testing.T) {
+	s, root := start(t, map[string]string{
+		// A project above the workspace that lists the stray file.
+		"Top.pproj":         `<Project><InputFiles><PFile>./App/Stray/</PFile></InputFiles></Project>`,
+		"App/App.pproj":     appProject,
+		"App/PSrc/Main.p":   mainP,
+		"App/Stray/Stray.p": otherMain,
+	}, client{workspace: "App"})
+
+	open(t, s, root, "App/Stray/Stray.p")
+	assertDiscovered(t, s, root)
 }

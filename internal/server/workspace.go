@@ -1,6 +1,7 @@
 package server
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -39,8 +40,8 @@ func (s *Server) didChangeWatchedFiles(_ *glsp.Context, params *protocol.DidChan
 
 // reloadWorkspace rebuilds the project index from the .pproj files on disk and
 // loads or drops documents to match: every P file under the workspace roots,
-// plus every file in the projects they include. Open documents are kept.
-// Callers must hold mu.
+// plus every file in the projects they include or that were discovered.
+// Open documents are kept. Callers must hold mu.
 func (s *Server) reloadWorkspace() {
 	projects := project.NewIndex()
 	want := map[string]bool{}
@@ -54,8 +55,9 @@ func (s *Server) reloadWorkspace() {
 			want[path] = true
 		}
 	}
-	// Included projects can live outside the workspace, as with the P
-	// tutorials' ../Common/Timer.
+	projects.Load(s.discovered...)
+	// Included and discovered projects can live outside the workspace, as
+	// with the P tutorials' ../Common/Timer.
 	for _, path := range projects.Files() {
 		want[path] = true
 	}
@@ -79,4 +81,53 @@ func (s *Server) reloadWorkspace() {
 	// The projects may now include different directories outside the
 	// workspace.
 	s.updateWatchers()
+}
+
+// discoverProject finds the project of a file opened outside the workspace,
+// whose .pproj wasn't found when the workspace was loaded. It searches the
+// file's directory and then each parent for .pproj files, and keeps the first
+// that list the file, for the rest of the session. Callers must hold mu.
+func (s *Server) discoverProject(path string) {
+	if !filepath.IsAbs(path) || s.inWorkspace(path) {
+		return
+	}
+	if _, ok := s.projects.Visible(path); ok {
+		return
+	}
+
+	for dir := filepath.Dir(path); ; {
+		if found := projectsListing(dir, path); len(found) > 0 {
+			log.Infof("found %s for %s", strings.Join(found, ", "), path)
+			s.discovered = append(s.discovered, found...)
+			s.reloadWorkspace()
+			return
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return
+		}
+		dir = parent
+	}
+}
+
+// projectsListing returns the .pproj files directly in dir that list file,
+// directly or through the projects they include.
+func projectsListing(dir, file string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var found []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".pproj") {
+			continue
+		}
+		pproj := filepath.Join(dir, entry.Name())
+		index := project.NewIndex()
+		index.Load(pproj)
+		if _, ok := index.Visible(file); ok {
+			found = append(found, pproj)
+		}
+	}
+	return found
 }
