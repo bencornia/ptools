@@ -18,7 +18,7 @@ type Fix struct {
 // through types that the compiler would otherwise only report on save.
 func Diagnostics(workspace []*Document, doc *Document) []protocol.Diagnostic {
 	diagnostics := SyntaxDiagnostics(doc)
-	for _, f := range typeFixes(workspace, doc) {
+	for _, f := range semanticFixes(workspace, doc) {
 		diagnostics = append(diagnostics, f.Diagnostic)
 	}
 	return diagnostics
@@ -27,7 +27,13 @@ func Diagnostics(workspace []*Document, doc *Document) []protocol.Diagnostic {
 // Fixes returns the problems in doc that can be fixed automatically. Each
 // one's diagnostic is also among Diagnostics.
 func Fixes(workspace []*Document, doc *Document) []Fix {
-	return append(syntaxFixes(doc), typeFixes(workspace, doc)...)
+	return append(syntaxFixes(doc), semanticFixes(workspace, doc)...)
+}
+
+// semanticFixes finds the mistakes that parse but that the compiler would
+// reject.
+func semanticFixes(workspace []*Document, doc *Document) []Fix {
+	return append(typeFixes(workspace, doc), undefinedEventFixes(workspace, doc)...)
 }
 
 // isMissingTupleComma reports whether n is the comma tree-sitter expected
@@ -119,7 +125,7 @@ func parenthesizedNotTuple(workspace []*Document, doc *Document, paren *sitter.N
 // tuple, which is never reported.
 func isNotTuple(workspace []*Document, doc *Document, expr *sitter.Node) bool {
 	switch expr.Kind() {
-	case "int_literal", "float_literal", "bool_literal", "string_literal", "null_literal",
+	case "int_literal", "float_literal", "bool_literal", "string_literal", "string_expression", "null_literal",
 		"bin_expression", "unary_expression":
 		return true
 	case "identifier":

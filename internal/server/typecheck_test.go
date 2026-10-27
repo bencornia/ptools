@@ -124,14 +124,16 @@ func TestSaveTypeChecksTheProject(t *testing.T) {
 
 func TestOpenFileShowsSyntaxAndTypeErrors(t *testing.T) {
 	s, root := start(t, map[string]string{
-		"App/App.pproj":   appProject,
-		"App/PSrc/Main.p": mainP,
+		"App/App.pproj":     appProject,
+		"App/PSrc/Events.p": "event eFoo;\n",
+		"App/PSrc/Main.p":   mainP,
 	}, client{})
 	output, _ := withFakeCompiler(t, s)
 	published := make(chan protocol.PublishDiagnosticsParams, 10)
 	ctx := publishingContext(published)
 	main := filepath.Join(root, "App/PSrc/Main.p")
 
+	// An error only the compiler finds.
 	os.WriteFile(output, []byte("[Error:] [PSrc/Main.p:3:8] could not find event 'eFoo'\n"), 0o644)
 	save(t, s, ctx, main)
 	collect(t, published, root, 1)
@@ -174,5 +176,39 @@ func TestMissingCompilerTurnsTypeCheckingOff(t *testing.T) {
 	s.SetCompiler([]string{"p-lsp-no-such-compiler"}, time.Second)
 	if s.compiler != nil {
 		t.Error("type checking is on without a compiler")
+	}
+}
+
+func TestCompilerErrorsFoundWhileEditingAreNotRepeated(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":   appProject,
+		"App/PSrc/Main.p": mainP,
+	}, client{})
+	output, _ := withFakeCompiler(t, s)
+	published := make(chan protocol.PublishDiagnosticsParams, 10)
+	ctx := publishingContext(published)
+	main := filepath.Join(root, "App/PSrc/Main.p")
+
+	// eFoo is undefined, which the server finds itself.
+	os.WriteFile(output, []byte("[Error:] [PSrc/Main.p:3:8] could not find event 'eFoo'\n"), 0o644)
+	if err := s.didOpen(ctx, &protocol.DidOpenTextDocumentParams{TextDocument: protocol.TextDocumentItem{
+		URI: pathToURI(main), LanguageID: "p", Version: 1, Text: mainP,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	collect(t, published, root, 1)
+	save(t, s, ctx, main)
+	got := collect(t, published, root, 1)["App/PSrc/Main.p"]
+	if len(got) != 1 || !strings.Contains(got[0], "p-lsp: undefined event `eFoo`") {
+		t.Errorf("got %v, want only the server's own report", got)
+	}
+
+	// Once the file is closed, the compiler's is all there is.
+	if err := s.didClose(ctx, &protocol.DidCloseTextDocumentParams{TextDocument: protocol.TextDocumentIdentifier{URI: pathToURI(main)}}); err != nil {
+		t.Fatal(err)
+	}
+	got = collect(t, published, root, 1)["App/PSrc/Main.p"]
+	if len(got) != 1 || !strings.Contains(got[0], "p compile: could not find event") {
+		t.Errorf("after closing, got %v", got)
 	}
 }

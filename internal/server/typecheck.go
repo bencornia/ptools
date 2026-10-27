@@ -111,8 +111,18 @@ func (s *Server) diagnosticsFor(path string) []protocol.Diagnostic {
 	if doc, ok := s.docs[path]; ok && s.open[path] {
 		diagnostics = append(diagnostics, analysis.Diagnostics(s.visibleDocs(path), doc)...)
 	}
+	// The compiler's report of a problem already found as the file was
+	// edited, such as an undefined event, would only repeat it.
+	live := map[protocol.Range]bool{}
+	for _, d := range diagnostics {
+		live[d.Range] = true
+	}
 	for _, pproj := range slices.Sorted(maps.Keys(s.compileDiagnostics)) {
-		diagnostics = append(diagnostics, s.compileDiagnostics[pproj][path]...)
+		for _, d := range s.compileDiagnostics[pproj][path] {
+			if !live[d.Range] {
+				diagnostics = append(diagnostics, d)
+			}
+		}
 	}
 	return diagnostics
 }
