@@ -63,7 +63,7 @@ newer compilers report them all at once.
 - [x] Workspace symbol search, with fuzzy matching
 - [x] Type-check diagnostics from `p compile` on save
 - [x] Verify type-check diagnostics against the real P compiler (P 3.1.0)
-- [ ] Completion of names in scope
+- [x] Completion: names in scope, fields after `.`, states after `goto`, and keywords
 - [ ] Semantic tokens
 - [ ] Folding and selection ranges
 - [ ] Tests for `internal/server`

@@ -541,3 +541,34 @@ func TestUnsavedBufferSeesTheWorkspace(t *testing.T) {
 		t.Errorf("got %+v, want the definition in Tst/Test1/events.p", locs)
 	}
 }
+
+func TestCompletionStaysInTheProject(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":     appProject,
+		"App/PSrc/Events.p": "event eFoo;\n",
+		"App/PSrc/Main.p":   mainP,
+		"Other/Other.pproj": appProject,
+		"Other/PSrc/Bar.p":  "event eBar;\n",
+	}, client{})
+
+	// Just after "on " in Main.p.
+	items, err := s.completion(fakeContext(nil), &protocol.CompletionParams{
+		TextDocumentPositionParams: protocol.TextDocumentPositionParams{
+			TextDocument: protocol.TextDocumentIdentifier{URI: pathToURI(filepath.Join(root, "App/PSrc/Main.p"))},
+			Position:     protocol.Position{Line: 2, Character: 7},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := []string{}
+	for _, item := range items.([]protocol.CompletionItem) {
+		if *item.Kind != protocol.CompletionItemKindKeyword {
+			got = append(got, item.Label)
+		}
+	}
+	slices.Sort(got)
+	if want := []string{"M", "eFoo"}; !slices.Equal(got, want) {
+		t.Errorf("got %v, want %v", got, want)
+	}
+}

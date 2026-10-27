@@ -76,6 +76,7 @@ func New(version string) *Server {
 		TextDocumentDefinition:         s.definition,
 		TextDocumentReferences:         s.references,
 		TextDocumentHover:              s.hover,
+		TextDocumentCompletion:         s.completion,
 		TextDocumentPrepareRename:      s.prepareRename,
 		TextDocumentRename:             s.rename,
 		WorkspaceSymbol:                s.workspaceSymbol,
@@ -115,6 +116,9 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	// a name can be renamed before the client asks for the new name.
 	prepare := true
 	capabilities.RenameProvider = protocol.RenameOptions{PrepareProvider: &prepare}
+
+	// Complete fields as soon as a `.` is typed.
+	capabilities.CompletionProvider.TriggerCharacters = []string{"."}
 
 	return protocol.InitializeResult{
 		Capabilities: capabilities,
@@ -210,6 +214,17 @@ func (s *Server) hover(_ *glsp.Context, params *protocol.HoverParams) (*protocol
 		return nil, nil
 	}
 	return analysis.Hover(s.visibleDocs(path), doc, params.Position), nil
+}
+
+func (s *Server) completion(_ *glsp.Context, params *protocol.CompletionParams) (any, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(params.TextDocument.URI)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil, nil
+	}
+	return analysis.Completion(s.parser, s.visibleDocs(path), doc, params.Position), nil
 }
 
 // maxWorkspaceSymbols caps workspace symbol results; editors re-query as the

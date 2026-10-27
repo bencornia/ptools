@@ -54,6 +54,9 @@ func resolveField(workspace []*Document, doc *Document, access, field *sitter.No
 // specReference reports whether expr names a spec machine, which the P
 // verifier lets you read variables from, as in `Consistency.kv`.
 func specReference(workspace []*Document, doc *Document, expr *sitter.Node) (declaration, bool) {
+	for expr != nil && (expr.Kind() == "lvalue" || expr.Kind() == "var_lvalue") {
+		expr = expr.NamedChild(0)
+	}
 	if expr == nil || expr.Kind() != "identifier" {
 		return declaration{}, false
 	}
@@ -449,61 +452,67 @@ func elementType(workspace []*Document, container typeRef) (typeRef, bool) {
 // fieldOf returns the declaration of the field called name in values of
 // type t.
 func fieldOf(workspace []*Document, t typeRef, name string) (declaration, bool) {
+	if found := named(fieldsOf(workspace, t), name); len(found) > 0 {
+		return found[0], true
+	}
+	return declaration{}, false
+}
+
+// fieldsOf returns the fields of values of type t. A name can appear more
+// than once, for an event set whose events share a field; the first one is
+// the one the compiler uses.
+func fieldsOf(workspace []*Document, t typeRef) []declaration {
 	u, ok := underlying(workspace, t)
 	if !ok {
-		return declaration{}, false
+		return nil
 	}
 	switch u.node.Kind() {
 	case "named_tuple_type":
-		return tupleField(u, name)
+		return tupleFields(u)
 	case "named_type":
 		if typeName := u.node.ChildByFieldName("name"); typeName != nil {
-			return verifierField(workspace, typeName.Utf8Text(u.doc.Text), name)
+			return verifierFields(workspace, typeName.Utf8Text(u.doc.Text))
 		}
 	}
-	return declaration{}, false
+	return nil
 }
 
-func tupleField(tuple typeRef, name string) (declaration, bool) {
+func tupleFields(tuple typeRef) []declaration {
 	list := firstChildOfKind(tuple.node, "identifier_type_list")
 	if list == nil {
-		return declaration{}, false
+		return nil
 	}
+	names := []*sitter.Node{}
 	for _, field := range namedChildren(list) {
-		if n := field.ChildByFieldName("name"); n != nil && n.Utf8Text(tuple.doc.Text) == name {
-			return declaration{doc: tuple.doc, node: n, name: name}, true
-		}
+		names = appendName(names, field, "name")
 	}
-	return declaration{}, false
+	return declarationsOf(tuple.doc, names)
 }
 
-// verifierField resolves a field of a value whose type is the machine,
+// verifierFields returns the fields of a value whose type is the machine,
 // interface, event or event set called typeName. The P verifier lets
 // `n.voted` read machine n's variable voted, and `e.src` read field src of
 // event e's payload.
-func verifierField(workspace []*Document, typeName, name string) (declaration, bool) {
+func verifierFields(workspace []*Document, typeName string) []declaration {
 	globals := globalDeclarationsIn(workspace, nsValue)
+	fields := []declaration{}
 	for _, d := range named(globals, typeName) {
 		switch decl := d.node.Parent(); decl.Kind() {
 		case "impl_machine_declaration", "spec_machine_declaration", "scenario_machine_declaration":
-			if v, ok := machineVariable(d.doc, decl, name); ok {
-				return v, true
-			}
+			fields = append(fields, machineVariables(d.doc, decl)...)
 		case "interface_declaration":
 			// The compiler uses the machine with the interface's name.
 			for _, m := range named(globals, typeName) {
 				if machineBody(m.node.Parent()) != nil {
-					if v, ok := machineVariable(m.doc, m.node.Parent(), name); ok {
-						return v, true
-					}
+					fields = append(fields, machineVariables(m.doc, m.node.Parent())...)
 				}
 			}
 		case "event_declaration":
 			if payload, ok := typeChild(d.doc, decl); ok {
-				return fieldOf(workspace, payload, name)
+				fields = append(fields, fieldsOf(workspace, payload)...)
 			}
 		case "event_set_declaration":
-			// The first event in the set whose payload has the field.
+			// The fields of each event in the set, in order.
 			events := firstChildOfKind(decl, "event_set_literal")
 			if events == nil {
 				continue
@@ -512,23 +521,30 @@ func verifierField(workspace []*Document, typeName, name string) (declaration, b
 				// Skipping the set's own name guards against a set that
 				// lists itself, which the compiler would reject anyway.
 				if eventName := event.Utf8Text(d.doc.Text); eventName != typeName {
-					if f, ok := verifierField(workspace, eventName, name); ok {
-						return f, true
-					}
+					fields = append(fields, verifierFields(workspace, eventName)...)
 				}
 			}
 		}
 	}
-	return declaration{}, false
+	return fields
 }
 
 func machineVariable(doc *Document, machine *sitter.Node, name string) (declaration, bool) {
-	for _, d := range named(declarationsOf(doc, machineMembers(machineBody(machine), nsValue)), name) {
-		if d.node.Parent().Kind() == "identifier_list" {
-			return d, true
-		}
+	if found := named(machineVariables(doc, machine), name); len(found) > 0 {
+		return found[0], true
 	}
 	return declaration{}, false
+}
+
+// machineVariables returns a machine's variables, without its functions.
+func machineVariables(doc *Document, machine *sitter.Node) []declaration {
+	vars := []declaration{}
+	for _, d := range declarationsOf(doc, machineMembers(machineBody(machine), nsValue)) {
+		if d.node.Parent().Kind() == "identifier_list" {
+			vars = append(vars, d)
+		}
+	}
+	return vars
 }
 
 // underlying follows type aliases to the type they stand for. A named type
