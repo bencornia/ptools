@@ -14,6 +14,7 @@ const (
 	nsValue namespace = iota
 	nsState
 	nsModule
+	nsCount
 )
 
 // declaration is a declared name: the identifier that introduces it, and the
@@ -63,7 +64,7 @@ func resolve(workspace []*Document, doc *Document, ident *sitter.Node) []declara
 	ns := namespaceOf(ident)
 
 	for scope := ident.Parent(); scope != nil; scope = scope.Parent() {
-		if found := named(declarationsOf(doc, scopeDeclarations(scope, ns)), name); len(found) > 0 {
+		if found := named(doc.scopeDeclarations(scope, ns), name); len(found) > 0 {
 			return found
 		}
 	}
@@ -196,6 +197,23 @@ func namespaceOf(ident *sitter.Node) namespace {
 	return nsValue
 }
 
+// scopeDeclarations returns the declarations directly in scope, a node of
+// d. Callers mustn't modify the result, which is cached.
+func (d *Document) scopeDeclarations(scope *sitter.Node, ns namespace) []declaration {
+	d.scopesMu.Lock()
+	defer d.scopesMu.Unlock()
+	key := scopeKey{scope.Id(), ns}
+	decls, ok := d.scopes[key]
+	if !ok {
+		if d.scopes == nil {
+			d.scopes = map[scopeKey][]declaration{}
+		}
+		decls = declarationsOf(d, scopeDeclarations(scope, ns))
+		d.scopes[key] = decls
+	}
+	return decls
+}
+
 // scopeDeclarations returns the name nodes declared directly in scope.
 func scopeDeclarations(scope *sitter.Node, ns namespace) []*sitter.Node {
 	switch ns {
@@ -289,9 +307,17 @@ var globalNameFields = map[string]string{
 func globalDeclarationsIn(workspace []*Document, ns namespace) []declaration {
 	decls := []declaration{}
 	for _, doc := range workspace {
-		decls = append(decls, globalDeclarations(doc, doc.Tree.RootNode(), ns)...)
+		decls = append(decls, doc.globalDeclarations(ns)...)
 	}
 	return decls
+}
+
+// globalDeclarations returns doc's top-level declarations in namespace ns.
+// Callers mustn't modify the result, which is cached.
+func (d *Document) globalDeclarations(ns namespace) []declaration {
+	cache := &d.globals[ns]
+	cache.once.Do(func() { cache.decls = globalDeclarations(d, d.Tree.RootNode(), ns) })
+	return cache.decls
 }
 
 // globalDeclarations returns the top-level declarations under node in

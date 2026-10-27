@@ -32,8 +32,7 @@ var completionKinds = map[protocol.SymbolKind]protocol.CompletionItemKind{
 // fields after a `.`, the machine's states after `goto`, and otherwise the
 // names in scope and P's keywords. Clients filter them by what's typed.
 func Completion(parser *sitter.Parser, workspace []*Document, doc *Document, pos protocol.Position) []protocol.CompletionItem {
-	point := doc.Point(pos)
-	offset := doc.lineStarts[point.Row] + int(point.Column)
+	offset := int(doc.offset(pos))
 	text := string(doc.Text[:offset]) + placeholder + string(doc.Text[offset:])
 	edited := Parse(parser, doc.URI, doc.Version, text)
 	defer edited.Close()
@@ -69,7 +68,7 @@ func Completion(parser *sitter.Parser, workspace []*Document, doc *Document, pos
 	default:
 		ns := namespaceOf(ident)
 		for scope := parent; scope != nil; scope = scope.Parent() {
-			decls = append(decls, declarationsOf(edited, scopeDeclarations(scope, ns))...)
+			decls = append(decls, edited.scopeDeclarations(scope, ns)...)
 		}
 		if ns != nsState {
 			decls = append(decls, globalDeclarationsIn(workspace, ns)...)

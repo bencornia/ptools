@@ -3,6 +3,7 @@
 package analysis
 
 import (
+	"sync"
 	"unicode/utf16"
 	"unicode/utf8"
 
@@ -32,6 +33,21 @@ type Document struct {
 
 	// lineStarts[i] is the byte offset where line i begins.
 	lineStarts []int
+
+	// globals caches the top-level declarations in each namespace, which
+	// name resolution looks through for most names.
+	globals [nsCount]struct {
+		once  sync.Once
+		decls []declaration
+	}
+	// scopes caches the declarations in each scope it's asked about.
+	scopesMu sync.Mutex
+	scopes   map[scopeKey][]declaration
+}
+
+type scopeKey struct {
+	id uintptr
+	ns namespace
 }
 
 // Parse builds a Document from the full text of a file.
@@ -93,6 +109,25 @@ func (d *Document) Point(pos protocol.Position) sitter.Point {
 		offset += size
 	}
 	return sitter.Point{Row: uint(row), Column: uint(offset - start)}
+}
+
+// offset converts an LSP position to a byte offset in the text.
+func (d *Document) offset(pos protocol.Position) uint {
+	p := d.Point(pos)
+	return uint(d.lineStarts[p.Row]) + p.Column
+}
+
+// lineLength returns the length in bytes of line row, without its line
+// ending.
+func (d *Document) lineLength(row uint) uint {
+	start, end := d.lineStarts[row], len(d.Text)
+	if int(row)+1 < len(d.lineStarts) {
+		end = d.lineStarts[row+1] - 1 // the '\n'
+	}
+	if end > start && d.Text[end-1] == '\r' {
+		end--
+	}
+	return uint(end - start)
 }
 
 // WordRange returns the range of the token at pos, such as a name or keyword,

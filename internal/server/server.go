@@ -65,22 +65,24 @@ func New(version string) *Server {
 		pendingWatchers: make(chan []fileSystemWatcher, 1),
 	}
 	s.handler = protocol.Handler{
-		Initialize:                     s.initialize,
-		Initialized:                    s.initialized,
-		Shutdown:                       s.shutdown,
-		TextDocumentDidOpen:            s.didOpen,
-		TextDocumentDidChange:          s.didChange,
-		TextDocumentDidClose:           s.didClose,
-		TextDocumentDidSave:            s.didSave,
-		TextDocumentDocumentSymbol:     s.documentSymbol,
-		TextDocumentDefinition:         s.definition,
-		TextDocumentReferences:         s.references,
-		TextDocumentHover:              s.hover,
-		TextDocumentCompletion:         s.completion,
-		TextDocumentPrepareRename:      s.prepareRename,
-		TextDocumentRename:             s.rename,
-		WorkspaceSymbol:                s.workspaceSymbol,
-		WorkspaceDidChangeWatchedFiles: s.didChangeWatchedFiles,
+		Initialize:                      s.initialize,
+		Initialized:                     s.initialized,
+		Shutdown:                        s.shutdown,
+		TextDocumentDidOpen:             s.didOpen,
+		TextDocumentDidChange:           s.didChange,
+		TextDocumentDidClose:            s.didClose,
+		TextDocumentDidSave:             s.didSave,
+		TextDocumentDocumentSymbol:      s.documentSymbol,
+		TextDocumentDefinition:          s.definition,
+		TextDocumentReferences:          s.references,
+		TextDocumentHover:               s.hover,
+		TextDocumentCompletion:          s.completion,
+		TextDocumentSemanticTokensFull:  s.semanticTokensFull,
+		TextDocumentSemanticTokensRange: s.semanticTokensRange,
+		TextDocumentPrepareRename:       s.prepareRename,
+		TextDocumentRename:              s.rename,
+		WorkspaceSymbol:                 s.workspaceSymbol,
+		WorkspaceDidChangeWatchedFiles:  s.didChangeWatchedFiles,
 	}
 	return s
 }
@@ -116,6 +118,8 @@ func (s *Server) initialize(ctx *glsp.Context, params *protocol.InitializeParams
 	// a name can be renamed before the client asks for the new name.
 	prepare := true
 	capabilities.RenameProvider = protocol.RenameOptions{PrepareProvider: &prepare}
+
+	capabilities.SemanticTokensProvider.(*protocol.SemanticTokensOptions).Legend = analysis.TokenLegend
 
 	// Complete fields as soon as a `.` is typed.
 	capabilities.CompletionProvider.TriggerCharacters = []string{"."}
@@ -225,6 +229,25 @@ func (s *Server) completion(_ *glsp.Context, params *protocol.CompletionParams) 
 		return nil, nil
 	}
 	return analysis.Completion(s.parser, s.visibleDocs(path), doc, params.Position), nil
+}
+
+func (s *Server) semanticTokensFull(_ *glsp.Context, params *protocol.SemanticTokensParams) (*protocol.SemanticTokens, error) {
+	return s.semanticTokens(params.TextDocument.URI, nil), nil
+}
+
+func (s *Server) semanticTokensRange(_ *glsp.Context, params *protocol.SemanticTokensRangeParams) (any, error) {
+	return s.semanticTokens(params.TextDocument.URI, &params.Range), nil
+}
+
+func (s *Server) semanticTokens(uri protocol.DocumentUri, rng *protocol.Range) *protocol.SemanticTokens {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	path := key(uri)
+	doc, ok := s.docs[path]
+	if !ok {
+		return nil
+	}
+	return &protocol.SemanticTokens{Data: analysis.SemanticTokens(s.visibleDocs(path), doc, rng)}
 }
 
 // maxWorkspaceSymbols caps workspace symbol results; editors re-query as the

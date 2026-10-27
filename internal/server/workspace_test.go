@@ -572,3 +572,39 @@ func TestCompletionStaysInTheProject(t *testing.T) {
 		t.Errorf("got %v, want %v", got, want)
 	}
 }
+
+func TestSemanticTokens(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":     appProject,
+		"App/PSrc/Events.p": "event eFoo;\n",
+		"App/PSrc/Main.p":   mainP,
+	}, client{})
+
+	// A second server, since initializing again would reset the first.
+	result, err := New("test").initialize(fakeContext(nil), &protocol.InitializeParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := result.(protocol.InitializeResult).Capabilities.SemanticTokensProvider.(*protocol.SemanticTokensOptions)
+	if len(provider.Legend.TokenTypes) == 0 || provider.Full != true || provider.Range != true {
+		t.Errorf("semantic tokens provider: %+v", provider)
+	}
+
+	// "on eFoo" in Main.p, where eFoo is declared in Events.p.
+	uri := pathToURI(filepath.Join(root, "App/PSrc/Main.p"))
+	tokens, err := s.semanticTokensRange(fakeContext(nil), &protocol.SemanticTokensRangeParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: uri},
+		Range:        protocol.Range{Start: protocol.Position{Line: 2}, End: protocol.Position{Line: 3}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := tokens.(*protocol.SemanticTokens).Data
+	var types []string
+	for i := 0; i+5 <= len(data); i += 5 {
+		types = append(types, provider.Legend.TokenTypes[data[i+3]])
+	}
+	if want := []string{"keyword", "event", "keyword"}; !slices.Equal(types, want) {
+		t.Errorf("got %v, want %v", types, want)
+	}
+}
