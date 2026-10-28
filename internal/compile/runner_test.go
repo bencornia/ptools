@@ -193,3 +193,32 @@ func TestAvailableInDotnetTools(t *testing.T) {
 		t.Errorf("p ran with DOTNET_ROOT and PATH %q, not %q", got, want)
 	}
 }
+
+// The compiler makes the project's output directory even when the build
+// goes elsewhere; an empty one it made is removed, and nothing else is.
+func TestCheckRemovesEmptyOutputDirectory(t *testing.T) {
+	r, pproj := fakeCompiler(t, `
+mkdir -p PGenerated Made
+touch Made/file
+echo "Type checking ..."
+`)
+	dir := filepath.Dir(pproj)
+	os.Mkdir(filepath.Join(dir, "Empty"), 0o755) // the user's
+	if _, err := r.Check(pproj, nil); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]bool{"PGenerated": false, "Made": true, "Empty": true, "PSrc": true} {
+		if _, err := os.Stat(filepath.Join(dir, name)); (err == nil) != want {
+			t.Errorf("%s exists: %v, want %v", name, err == nil, want)
+		}
+	}
+	// A directory there before p-lsp first compiled is kept, even if it's
+	// empty after a later check.
+	os.Mkdir(filepath.Join(dir, "PGenerated"), 0o755)
+	r2, _ := fakeCompiler(t, "echo")
+	r2.Command = r.Command
+	r2.Check(pproj, nil)
+	if _, err := os.Stat(filepath.Join(dir, "PGenerated")); err != nil {
+		t.Error("removed an output directory that was there before")
+	}
+}
