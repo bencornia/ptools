@@ -1,8 +1,8 @@
 {
   "name": "p-lsp",
-  "displayName": "P language server",
-  "description": "Runs p-lsp for P (.p) files",
-  "version": "0.1.0",
+  "displayName": "P",
+  "description": "P language support: the p-lsp language server, pfmt formatting, and the prdb replay debugger",
+  "version": "0.2.0",
   "publisher": "bencornia",
   "repository": {
     "type": "git",
@@ -12,9 +12,14 @@
     "vscode": "^1.91.0"
   },
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Debuggers",
+    "Formatters"
   ],
   "main": "./extension.js",
+  "activationEvents": [
+    "onCommand:prdb.pickTrace"
+  ],
   "contributes": {
     "languages": [
       {
@@ -43,9 +48,82 @@
           },
           "default": [],
           "description": "Arguments to pass to p-lsp, such as [\"-compiler\", \"\"] to turn off type checking."
+        },
+        "prdb.path": {
+          "type": "string",
+          "default": "prdb",
+          "description": "The prdb binary to run for debugging."
+        },
+        "prdb.args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Arguments to pass to prdb, such as [\"-v\"] to log the protocol to its standard error."
         }
       }
-    }
+    },
+    "breakpoints": [
+      {
+        "language": "p"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "prdb",
+        "label": "P Replay",
+        "languages": [
+          "p"
+        ],
+        "variables": {
+          "pickTrace": "prdb.pickTrace"
+        },
+        "configurationAttributes": {
+          "launch": {
+            "required": [
+              "trace"
+            ],
+            "properties": {
+              "trace": {
+                "type": "string",
+                "description": "The PChecker trace to replay: a .trace.json file from PCheckerOutput. ${command:pickTrace} picks one from the workspace.",
+                "default": "${command:pickTrace}"
+              },
+              "project": {
+                "type": "string",
+                "description": "The P project's directory. By default, the nearest directory with a .pproj file, from the trace's up."
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Stop at the first step, rather than running to the first breakpoint.",
+                "default": true
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "prdb",
+            "request": "launch",
+            "name": "Replay a P trace",
+            "trace": "${command:pickTrace}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "P: Replay a trace",
+            "description": "Step through a PChecker trace with prdb",
+            "body": {
+              "type": "prdb",
+              "request": "launch",
+              "name": "Replay a P trace",
+              "trace": "^\"\\${command:pickTrace}\""
+            }
+          }
+        ]
+      }
+    ]
   },
   "dependencies": {
     "vscode-languageclient": "10.1.2"
