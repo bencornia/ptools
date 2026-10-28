@@ -1,0 +1,587 @@
+[
+  {
+    "type": "CreateMonitor",
+    "details": {
+      "log": "PongsCounted was created.",
+      "payload": "null",
+      "monitor": "PongsCounted",
+      "clock": {
+        "PongsCounted": 1
+      }
+    }
+  },
+  {
+    "type": "MonitorStateTransition",
+    "details": {
+      "log": "PongsCounted enters state \u0027Watching\u0027.",
+      "state": "Watching",
+      "payload": "null",
+      "isEntry": true,
+      "monitor": "PongsCounted",
+      "clock": {
+        "PongsCounted": 2
+      }
+    }
+  },
+  {
+    "type": "CreateStateMachine",
+    "details": {
+      "log": "Main(1) was created by task \u00272\u0027.",
+      "id": "Main(1)",
+      "payload": "null",
+      "clock": {
+        "Main(1)": 1
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Main(1) enters state \u0027Init\u0027.",
+      "id": "Main(1)",
+      "state": "Init",
+      "payload": "null",
+      "isEntry": true,
+      "clock": {
+        "Main(1)": 2
+      }
+    }
+  },
+  {
+    "type": "CreateStateMachine",
+    "details": {
+      "log": "Client(2) was created by Main(1).",
+      "id": "Client(2)",
+      "creatorName": "Main(1)",
+      "creatorType": "Main",
+      "payload": "null",
+      "clock": {
+        "Client(2)": 1
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) enters state \u0027Init\u0027.",
+      "id": "Client(2)",
+      "state": "Init",
+      "payload": "null",
+      "isEntry": true,
+      "clock": {
+        "Client(2)": 2
+      }
+    }
+  },
+  {
+    "type": "CreateStateMachine",
+    "details": {
+      "log": "Server(3) was created by Client(2).",
+      "id": "Server(3)",
+      "creatorName": "Client(2)",
+      "creatorType": "Client",
+      "payload": "null",
+      "clock": {
+        "Server(3)": 1
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Server(3) enters state \u0027Serving\u0027.",
+      "id": "Server(3)",
+      "state": "Serving",
+      "payload": "null",
+      "isEntry": true,
+      "clock": {
+        "Server(3)": 2
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 in state \u0027Init\u0027 sent event \u0027eHello with payload (Client(2))\u0027 to \u0027Server(3)\u0027.",
+      "event": "eHello",
+      "state": "Init",
+      "payload": "Client(2)",
+      "sender": "Client(2)",
+      "target": "Server(3)",
+      "isTargetHalted": false,
+      "clock": {
+        "Client(2)": 3
+      }
+    }
+  },
+  {
+    "type": "WaitMultipleEvents",
+    "details": {
+      "log": "Client(2) is waiting to dequeue an event of type \u0027eHelloBack\u0027 or \u0027PHalt\u0027 in state \u0027Init\u0027.",
+      "id": "Client(2)",
+      "payload": "null",
+      "eventTypes": [
+        "eHelloBack",
+        "PHalt"
+      ],
+      "clock": {
+        "Client(2)": 4
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 dequeued event \u0027eHello with payload (Client(2))\u0027 in state \u0027Serving\u0027.",
+      "id": "Server(3)",
+      "event": "eHello",
+      "state": "Serving",
+      "payload": "Client(2)",
+      "clock": {
+        "Server(3)": 3,
+        "Client(2)": 3
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 in state \u0027Serving\u0027 sent event \u0027eHelloBack\u0027 to \u0027Client(2)\u0027.",
+      "event": "eHelloBack",
+      "state": "Serving",
+      "payload": "null",
+      "sender": "Server(3)",
+      "target": "Client(2)",
+      "isTargetHalted": false,
+      "clock": {
+        "Server(3)": 4,
+        "Client(2)": 3
+      }
+    }
+  },
+  {
+    "type": "ReceiveEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 dequeued event \u0027eHelloBack\u0027 and unblocked in state \u0027Init\u0027.",
+      "id": "Client(2)",
+      "event": "eHelloBack",
+      "state": "Init",
+      "payload": "null",
+      "wasBlocked": true,
+      "clock": {
+        "Client(2)": 5,
+        "Server(3)": 4
+      }
+    }
+  },
+  {
+    "type": "GotoState",
+    "details": {
+      "log": "Client(2) is transitioning from state \u0027Init\u0027 to state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "startState": "Init",
+      "endState": "Pinging",
+      "payload": "null",
+      "clock": {
+        "Client(2)": 6,
+        "Server(3)": 4
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) exits state \u0027Init\u0027.",
+      "id": "Client(2)",
+      "state": "Init",
+      "payload": "null",
+      "isEntry": false,
+      "clock": {
+        "Client(2)": 7,
+        "Server(3)": 4
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) enters state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "state": "Pinging",
+      "payload": "null",
+      "isEntry": true,
+      "clock": {
+        "Client(2)": 8,
+        "Server(3)": 4
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 in state \u0027Pinging\u0027 sent event \u0027ePing with payload (\u003Cclient:Client(2), n:1, \u003E)\u0027 to \u0027Server(3)\u0027.",
+      "event": "ePing",
+      "state": "Pinging",
+      "payload": {
+        "client": "Client(2)",
+        "n": 1
+      },
+      "sender": "Client(2)",
+      "target": "Server(3)",
+      "isTargetHalted": false,
+      "clock": {
+        "Client(2)": 9,
+        "Server(3)": 4
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 dequeued event \u0027ePing with payload (\u003Cclient:Client(2), n:1, \u003E)\u0027 in state \u0027Serving\u0027.",
+      "id": "Server(3)",
+      "event": "ePing",
+      "state": "Serving",
+      "payload": {
+        "client": "Client(2)",
+        "n": 1
+      },
+      "clock": {
+        "Server(3)": 5,
+        "Client(2)": 9
+      }
+    }
+  },
+  {
+    "type": "MonitorProcessEvent",
+    "details": {
+      "log": "PongsCounted is processing event \u0027ePong with payload (1)\u0027 in state \u0027Watching\u0027.",
+      "event": "ePong",
+      "state": "Watching",
+      "payload": 1,
+      "sender": "Server(3)",
+      "monitor": "PongsCounted",
+      "clock": {
+        "PongsCounted": 3,
+        "Server(3)": 5,
+        "Client(2)": 9
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 in state \u0027Serving\u0027 sent event \u0027ePong with payload (1)\u0027 to \u0027Client(2)\u0027.",
+      "event": "ePong",
+      "state": "Serving",
+      "payload": 1,
+      "sender": "Server(3)",
+      "target": "Client(2)",
+      "isTargetHalted": false,
+      "clock": {
+        "Server(3)": 6,
+        "Client(2)": 9
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 dequeued event \u0027ePong with payload (1)\u0027 in state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "event": "ePong",
+      "state": "Pinging",
+      "payload": 1,
+      "clock": {
+        "Client(2)": 10,
+        "Server(3)": 6
+      }
+    }
+  },
+  {
+    "type": "Print",
+    "details": {
+      "log": "got pong 1",
+      "payload": "null"
+    }
+  },
+  {
+    "type": "GotoState",
+    "details": {
+      "log": "Client(2) is transitioning from state \u0027Pinging\u0027 to state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "startState": "Pinging",
+      "endState": "Pinging",
+      "payload": "null",
+      "clock": {
+        "Client(2)": 11,
+        "Server(3)": 6
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) exits state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "state": "Pinging",
+      "payload": "null",
+      "isEntry": false,
+      "clock": {
+        "Client(2)": 12,
+        "Server(3)": 6
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) enters state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "state": "Pinging",
+      "payload": "null",
+      "isEntry": true,
+      "clock": {
+        "Client(2)": 13,
+        "Server(3)": 6
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 in state \u0027Pinging\u0027 sent event \u0027ePing with payload (\u003Cclient:Client(2), n:2, \u003E)\u0027 to \u0027Server(3)\u0027.",
+      "event": "ePing",
+      "state": "Pinging",
+      "payload": {
+        "client": "Client(2)",
+        "n": 2
+      },
+      "sender": "Client(2)",
+      "target": "Server(3)",
+      "isTargetHalted": false,
+      "clock": {
+        "Client(2)": 14,
+        "Server(3)": 6
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 dequeued event \u0027ePing with payload (\u003Cclient:Client(2), n:2, \u003E)\u0027 in state \u0027Serving\u0027.",
+      "id": "Server(3)",
+      "event": "ePing",
+      "state": "Serving",
+      "payload": {
+        "client": "Client(2)",
+        "n": 2
+      },
+      "clock": {
+        "Server(3)": 7,
+        "Client(2)": 14
+      }
+    }
+  },
+  {
+    "type": "MonitorProcessEvent",
+    "details": {
+      "log": "PongsCounted is processing event \u0027ePong with payload (2)\u0027 in state \u0027Watching\u0027.",
+      "event": "ePong",
+      "state": "Watching",
+      "payload": 2,
+      "sender": "Server(3)",
+      "monitor": "PongsCounted",
+      "clock": {
+        "PongsCounted": 4,
+        "Server(3)": 7,
+        "Client(2)": 14
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 in state \u0027Serving\u0027 sent event \u0027ePong with payload (2)\u0027 to \u0027Client(2)\u0027.",
+      "event": "ePong",
+      "state": "Serving",
+      "payload": 2,
+      "sender": "Server(3)",
+      "target": "Client(2)",
+      "isTargetHalted": false,
+      "clock": {
+        "Server(3)": 8,
+        "Client(2)": 14
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 dequeued event \u0027ePong with payload (2)\u0027 in state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "event": "ePong",
+      "state": "Pinging",
+      "payload": 2,
+      "clock": {
+        "Client(2)": 15,
+        "Server(3)": 8
+      }
+    }
+  },
+  {
+    "type": "Print",
+    "details": {
+      "log": "got pong 2",
+      "payload": "null"
+    }
+  },
+  {
+    "type": "GotoState",
+    "details": {
+      "log": "Client(2) is transitioning from state \u0027Pinging\u0027 to state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "startState": "Pinging",
+      "endState": "Pinging",
+      "payload": "null",
+      "clock": {
+        "Client(2)": 16,
+        "Server(3)": 8
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) exits state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "state": "Pinging",
+      "payload": "null",
+      "isEntry": false,
+      "clock": {
+        "Client(2)": 17,
+        "Server(3)": 8
+      }
+    }
+  },
+  {
+    "type": "StateTransition",
+    "details": {
+      "log": "Client(2) enters state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "state": "Pinging",
+      "payload": "null",
+      "isEntry": true,
+      "clock": {
+        "Client(2)": 18,
+        "Server(3)": 8
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 in state \u0027Pinging\u0027 sent event \u0027ePing with payload (\u003Cclient:Client(2), n:3, \u003E)\u0027 to \u0027Server(3)\u0027.",
+      "event": "ePing",
+      "state": "Pinging",
+      "payload": {
+        "client": "Client(2)",
+        "n": 3
+      },
+      "sender": "Client(2)",
+      "target": "Server(3)",
+      "isTargetHalted": false,
+      "clock": {
+        "Client(2)": 19,
+        "Server(3)": 8
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 dequeued event \u0027ePing with payload (\u003Cclient:Client(2), n:3, \u003E)\u0027 in state \u0027Serving\u0027.",
+      "id": "Server(3)",
+      "event": "ePing",
+      "state": "Serving",
+      "payload": {
+        "client": "Client(2)",
+        "n": 3
+      },
+      "clock": {
+        "Server(3)": 9,
+        "Client(2)": 19
+      }
+    }
+  },
+  {
+    "type": "MonitorProcessEvent",
+    "details": {
+      "log": "PongsCounted is processing event \u0027ePong with payload (4)\u0027 in state \u0027Watching\u0027.",
+      "event": "ePong",
+      "state": "Watching",
+      "payload": 4,
+      "sender": "Server(3)",
+      "monitor": "PongsCounted",
+      "clock": {
+        "PongsCounted": 5,
+        "Server(3)": 9,
+        "Client(2)": 19
+      }
+    }
+  },
+  {
+    "type": "SendEvent",
+    "details": {
+      "log": "\u0027Server(3)\u0027 in state \u0027Serving\u0027 sent event \u0027ePong with payload (4)\u0027 to \u0027Client(2)\u0027.",
+      "event": "ePong",
+      "state": "Serving",
+      "payload": 4,
+      "sender": "Server(3)",
+      "target": "Client(2)",
+      "isTargetHalted": false,
+      "clock": {
+        "Server(3)": 10,
+        "Client(2)": 19
+      }
+    }
+  },
+  {
+    "type": "DequeueEvent",
+    "details": {
+      "log": "\u0027Client(2)\u0027 dequeued event \u0027ePong with payload (4)\u0027 in state \u0027Pinging\u0027.",
+      "id": "Client(2)",
+      "event": "ePong",
+      "state": "Pinging",
+      "payload": 4,
+      "clock": {
+        "Client(2)": 20,
+        "Server(3)": 10
+      }
+    }
+  },
+  {
+    "type": "Print",
+    "details": {
+      "log": "got pong 4",
+      "payload": "null"
+    }
+  },
+  {
+    "type": "AssertionFailure",
+    "details": {
+      "log": "Assertion Failed: PSrc/PingPong.p:46:13 expected 3 pongs, got 4",
+      "error": "Assertion Failed: PSrc/PingPong.p:46:13 expected 3 pongs, got 4",
+      "payload": "null"
+    }
+  },
+  {
+    "type": "StrategyDescription",
+    "details": {
+      "log": "Found bug using \u0027random\u0027 strategy.",
+      "payload": "null",
+      "strategy": "random",
+      "strategyDescription": "random[seed \u00272252859059\u0027]"
+    }
+  }
+]
