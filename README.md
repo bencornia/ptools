@@ -69,32 +69,40 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 `prdb -list trace.json` prints each step of a trace with its source
 location, without an editor.
 
-## Helix
+## VS Code
 
-Add a debugger to the `p` language in `~/.config/helix/languages.toml`, after
-its other settings:
+The debugger is part of the P extension, in p-lsp's
+[`editors/vscode`](https://github.com/bencornia/p-lsp/tree/main/editors/vscode).
+Install prdb, then build and install the extension:
 
-```toml
-[language.debugger]
-name = "prdb"
-transport = "stdio"
-command = "prdb"
-
-[[language.debugger.templates]]
-name = "replay a trace"
-request = "launch"
-completion = [ { name = "trace (.trace.json)", completion = "filename" } ]
-args = { trace = "{0}" }
+```sh
+cd p-lsp/editors/vscode
+npm install
+npx @vscode/vsce package --skip-license
+code --install-extension p-lsp-0.2.0.vsix
 ```
 
-Then `space G l` launches it and asks for the trace. `space G b` toggles a
-breakpoint, `c` continues, `n` steps to the machine's next step, `i` to the
-next step of any machine, `o` out, `v` lists variables, and `s` switches
-machines. Helix's debugger support is experimental, and has no step back.
+Open a `.p` file and start debugging (F5, or Run and Debug): with no
+`launch.json`, it asks which of the workspace's traces to replay, newest
+first. To keep a configuration, add one with the "P: Replay a trace" snippet:
 
-## Neovim
+```json
+{
+  "type": "prdb",
+  "request": "launch",
+  "name": "Replay a P trace",
+  "trace": "${command:pickTrace}"
+}
+```
 
-With [nvim-dap](https://github.com/mfussenegger/nvim-dap):
+Set `trace` to a path, relative to the workspace folder, to skip the picker.
+Breakpoints go in the gutter of `.p` files; the toolbar's Step Back and
+Reverse buttons move backward. Set `prdb.path` if `prdb` isn't on the `PATH`
+VS Code sees, and `prdb.args` to `["-v"]` to log the protocol.
+
+## Other editors
+
+With [nvim-dap](https://github.com/mfussenegger/nvim-dap) in Neovim:
 
 ```lua
 local dap = require('dap')
@@ -103,11 +111,16 @@ dap.configurations.p = {
   {
     type = 'prdb',
     request = 'launch',
-    name = 'Replay a trace',
+    name = 'Replay a P trace',
     trace = function() return vim.fn.input('Trace: ', '', 'file') end,
   },
 }
 ```
+
+Helix's debugger support is experimental, and has no step back. prdb works
+around its not selecting the thread at the first stop, so with a
+`[language.debugger]` for `p` whose launch template passes `trace`, it can
+step forward through a trace.
 
 ## Launch arguments
 
@@ -132,10 +145,10 @@ PChecker wrote for it.
 - [x] Map each step to its handler or statement, through helper functions and included projects
 - [x] Debug adapter: a thread per machine, stepping both ways, breakpoints, payloads and inboxes, stopping at the failed assertion
 - [x] `prdb -list`
-- [x] Helix setup
+- [x] VS Code: the debugger in p-lsp's VS Code extension, with a trace picker
 - [ ] Launch from a `.schedule` file, replaying it with `p check --replay -v`
 - [ ] Launch a test case: run `p check` to find a bug, then replay it
 - [ ] Choose which schedule of a `--verbose` trace with several to replay
-- [ ] VS Code: add the debugger to p-lsp's extension
+- [ ] Try the VS Code debugger in VS Code itself; it's tested against the protocol and a stand-in for VS Code's API
 - [ ] Test the Neovim setup
 - [ ] A sequence diagram of a trace, from its vector clocks

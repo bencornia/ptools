@@ -258,3 +258,19 @@ func TestLaunchErrors(t *testing.T) {
 		}
 	}
 }
+
+// VS Code sends its own fields with the launch arguments, and a trace path
+// relative to the workspace folder, which it runs prdb in.
+func TestLaunchFromVSCode(t *testing.T) {
+	t.Chdir("../../testdata/pingpong")
+	c := connect(t)
+	c.request(&godap.InitializeRequest{Request: godap.Request{Command: "initialize"}})
+	args := json.RawMessage(`{"type": "prdb", "request": "launch", "name": "Replay a P trace",
+		"trace": "bug.trace.json", "__sessionId": "1234", "__configurationTarget": 6}`)
+	c.request(&godap.LaunchRequest{Request: godap.Request{Command: "launch"}, Arguments: args})
+	c.request(&godap.ConfigurationDoneRequest{Request: godap.Request{Command: "configurationDone"}})
+	if s := c.stopped(); s.Reason != "entry" {
+		t.Errorf("stopped %+v", s)
+	}
+	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
+}
