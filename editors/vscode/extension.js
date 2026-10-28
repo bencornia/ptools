@@ -44,13 +44,13 @@ function resolveDebugConfiguration(folder, config) {
     return config;
 }
 
-// Asks which of the workspace's PChecker traces to replay, newest first.
-// Returning undefined cancels the launch.
+// Asks which of the workspace's PChecker traces or schedules to replay,
+// newest first. Returning undefined cancels the launch.
 async function pickTrace() {
-    const uris = await vscode.workspace.findFiles('**/*.trace.json', '**/node_modules/**');
+    const uris = await vscode.workspace.findFiles('**/*.{trace.json,schedule}', '**/node_modules/**');
     if (uris.length === 0) {
         vscode.window.showErrorMessage(
-            'No PChecker traces (*.trace.json) in the workspace. Run p check to find a bug, or p check -v to trace a run.',
+            'No PChecker traces (*.trace.json) or schedules (*.schedule) in the workspace. Run p check to find a bug, or p check -v to trace a run.',
         );
         return undefined;
     }

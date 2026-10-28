@@ -87,7 +87,7 @@
             "properties": {
               "trace": {
                 "type": "string",
-                "description": "The PChecker trace to replay: a .trace.json file from PCheckerOutput. ${command:pickTrace} picks one from the workspace.",
+                "description": "The PChecker trace to replay: a .trace.json file from PCheckerOutput, or a .schedule file, which prdb compiles the project to replay with p check. ${command:pickTrace} picks one from the workspace.",
                 "default": "${command:pickTrace}"
               },
               "project": {
@@ -98,6 +98,12 @@
                 "type": "boolean",
                 "description": "Stop at the first step, rather than running to the first breakpoint.",
                 "default": true
+              },
+              "compiler": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "The command that runs the P tool, to replay a schedule.",
+                "default": ["p"]
               }
             }
           }
