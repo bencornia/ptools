@@ -204,13 +204,18 @@ VS Code needs an extension to start a language server; a minimal one is in
 cd editors/vscode
 npm install
 npx @vscode/vsce package --skip-license
-code --install-extension p-lsp-0.2.0.vsix
+code --install-extension p-lsp-0.3.0.vsix
 ```
 
 It highlights with the server's semantic tokens. Set `p-lsp.path` if
 `p-lsp` isn't on the `PATH` VS Code sees, and `p-lsp.args` to pass flags
 such as `["-compiler", ""]`. Format Document formats with pfmt; to format
 on save, add `"[p]": { "editor.formatOnSave": true }` to `settings.json`.
+
+Naming warnings show in the files you have open, as in any editor. To see
+them for every P file in the workspace, run **P: Check Naming in Workspace**
+from the Command Palette: it runs `p-lsp lint` and puts what it finds in the
+Problems panel.
 
 The extension also runs [prdb](https://github.com/bencornia/prdb), a replay
 debugger for PChecker's traces: with prdb on the `PATH` (or `prdb.path`
