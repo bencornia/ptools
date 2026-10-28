@@ -1,4 +1,6 @@
 // Command p-lsp is a language server for the P programming language.
+//
+// Run as p-lsp lint [path ...], it checks the naming of P files instead.
 package main
 
 import (
@@ -16,6 +18,10 @@ import (
 const version = "0.1.0"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "lint" {
+		os.Exit(lint(os.Args[2:], os.Stdout, os.Stderr))
+	}
+
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	verbosity := flag.Int("v", 0, "log verbosity (logs go to stderr)")
 	// Editors commonly pass --stdio; it's the only transport, so accept and ignore it.

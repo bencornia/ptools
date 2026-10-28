@@ -6,18 +6,19 @@ import (
 	"strings"
 
 	"github.com/bencornia/p-lsp/internal/project"
+	"github.com/bencornia/p-lsp/internal/style"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-func (s *Server) didChangeWatchedFiles(_ *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
+func (s *Server) didChangeWatchedFiles(ctx *glsp.Context, params *protocol.DidChangeWatchedFilesParams) error {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	reload := false
+	reload, restyle := false, false
 	for _, change := range params.Changes {
 		path := key(change.URI)
 		switch {
+		case filepath.Base(path) == style.FileName:
+			restyle = true
 		case strings.EqualFold(filepath.Ext(path), ".pproj"):
 			reload = true
 		case change.Type == protocol.FileChangeTypeChanged:
@@ -34,6 +35,15 @@ func (s *Server) didChangeWatchedFiles(_ *glsp.Context, params *protocol.DidChan
 	}
 	if reload {
 		s.reloadWorkspace()
+	}
+	var notifications []protocol.PublishDiagnosticsParams
+	if restyle {
+		notifications = s.openDiagnostics()
+	}
+	s.mu.Unlock()
+
+	for _, n := range notifications {
+		ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, n)
 	}
 	return nil
 }

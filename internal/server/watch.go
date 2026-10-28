@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/bencornia/p-lsp/internal/project"
+	"github.com/bencornia/p-lsp/internal/style"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
@@ -106,7 +107,7 @@ func (s *Server) updateWatchers() {
 	if !s.watch.dynamic {
 		return
 	}
-	watchers := []fileSystemWatcher{{GlobPattern: "**/*.p"}, {GlobPattern: "**/*.pproj"}}
+	watchers := []fileSystemWatcher{{GlobPattern: "**/*.p"}, {GlobPattern: "**/*.pproj"}, {GlobPattern: "**/" + style.FileName}}
 	external := s.externalProjectDirs()
 	if s.watch.relative {
 		for _, dir := range external {

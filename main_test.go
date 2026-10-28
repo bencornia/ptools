@@ -446,3 +446,37 @@ func TestVersionFlag(t *testing.T) {
 		t.Errorf("-version printed %q, %v", out, err)
 	}
 }
+
+func TestLint(t *testing.T) {
+	dir := t.TempDir()
+	for name, text := range map[string]string{
+		"PSrc/Events.p":            "event lookup_done;\nevent eGood;\n",
+		"PSrc/Main.p":              "machine Client { start state Init { } }\n",
+		"Other/.hidden/Bad.p":      "event bad;\n",
+		"Other/Styled/.plint.toml": "[naming]\nevents = \"snake_case\"\n",
+		"Other/Styled/Snake.p":     "event lookup_done;\n",
+	} {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stdout, stderr strings.Builder
+	status := lint([]string{filepath.Join(dir, "...")}, &stdout, &stderr)
+	want := filepath.Join(dir, "PSrc/Events.p") + ":1:7: event name `lookup_done` should be TitleCase: `LookupDone`\n"
+	if status != 1 || stdout.String() != want || stderr.Len() > 0 {
+		t.Errorf("lint = %d, stdout %q, stderr %q; want 1, %q", status, stdout.String(), stderr.String(), want)
+	}
+
+	stdout.Reset()
+	if status := lint([]string{filepath.Join(dir, "PSrc/Main.p")}, &stdout, &stderr); status != 0 || stdout.Len() > 0 {
+		t.Errorf("clean file: lint = %d, stdout %q", status, stdout.String())
+	}
+	if status := lint([]string{filepath.Join(dir, "missing.p")}, &stdout, &stderr); status != 2 {
+		t.Errorf("missing file: lint = %d, want 2", status)
+	}
+}

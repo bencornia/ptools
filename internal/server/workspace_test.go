@@ -222,7 +222,7 @@ func TestRegistersFileWatchers(t *testing.T) {
 	if err := s.initialized(fakeContext(calls), &protocol.InitializedParams{}); err != nil {
 		t.Fatal(err)
 	}
-	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj")
+	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj", "**/.plint.toml")
 }
 
 // The P tutorials' layout: the workspace is App, which includes a project
@@ -242,7 +242,7 @@ func TestWatchesIncludedProjectsOutsideWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root),
-		"**/*.p", "**/*.pproj", "Common/Timer/**/*.p", "Common/Timer/**/*.pproj")
+		"**/*.p", "**/*.pproj", "**/.plint.toml", "Common/Timer/**/*.p", "Common/Timer/**/*.pproj")
 
 	// A change reported in the external project is picked up.
 	write(t, root, "Common/Timer/PSrc/Timer.p", "\nevent eTimeOut;\n")
@@ -256,7 +256,7 @@ func TestWatchesIncludedProjectsOutsideWorkspace(t *testing.T) {
 	if c := nextCall(t, calls); c.method != "client/unregisterCapability" {
 		t.Fatalf("got %s, want client/unregisterCapability", c.method)
 	}
-	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj")
+	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj", "**/.plint.toml")
 }
 
 func TestNoExternalWatchersWithoutRelativePatterns(t *testing.T) {
@@ -265,7 +265,7 @@ func TestNoExternalWatchersWithoutRelativePatterns(t *testing.T) {
 	if err := s.initialized(fakeContext(calls), &protocol.InitializedParams{}); err != nil {
 		t.Fatal(err)
 	}
-	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj")
+	assertPatterns(t, registeredPatterns(t, nextCall(t, calls), root), "**/*.p", "**/*.pproj", "**/.plint.toml")
 }
 
 func TestUnchangedWatchersAreNotReregistered(t *testing.T) {

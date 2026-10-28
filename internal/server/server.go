@@ -53,6 +53,9 @@ type Server struct {
 	// compileDiagnostics holds each project's last type-check diagnostics,
 	// by project and then by file path.
 	compileDiagnostics map[string]map[string][]protocol.Diagnostic
+	// styleErrors holds the last error reading each .plint.toml, so each is
+	// logged once.
+	styleErrors map[string]string
 }
 
 func New(version string) *Server {
@@ -250,6 +253,7 @@ func (s *Server) codeAction(_ *glsp.Context, params *protocol.CodeActionParams) 
 			},
 		})
 	}
+	actions = append(actions, s.renameActions(path, doc, params.Range)...)
 	return actions, nil
 }
 

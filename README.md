@@ -65,6 +65,54 @@ export PATH="$PATH:$HOME/.dotnet:$HOME/.dotnet/tools"
 P 3.0 stops at the first error, so errors are reported one at a time; P 3.1
 reports several at once. Both versions' output formats are understood.
 
+## Naming style
+
+p-lsp warns about declared names that don't follow a naming style, and
+offers to rename each one, along with everything that refers to it, unless
+the new name would clash with another. The default style:
+
+| Declaration | Case | Example |
+|---|---|---|
+| Types and enums | TitleCase | `type Lookup`, `enum Language` |
+| Machines, specs, interfaces, states, events, modules | TitleCase | `Client`, `Serving`, `LookupDone` |
+| Enum constants | SCREAMING_CASE | `ENGLISH`, `NOT_FOUND` |
+| Functions | snake_case | `pick_language` |
+| Variables, parameters, tuple fields, `param`s | snake_case | `request_count` |
+| Test cases | snake_case | `lookup_all_languages` |
+
+Hungarian prefixes, as in P's own examples, are allowed in any of them: a
+prefix followed by a TitleCase name, like `tLookup`, `eResponse` or
+`tcSingleClient`, is fine.
+
+To change the style, put a `.plint.toml` in your project. The nearest one in
+a file's directory or above it applies; settings it leaves out keep their
+defaults:
+
+```toml
+[naming]
+types = "TitleCase"
+enum_constants = "SCREAMING_CASE"
+events = "TitleCase"
+machines = "TitleCase"   # machines, specs, scenarios and interfaces
+states = "TitleCase"
+modules = "TitleCase"
+functions = "snake_case"
+variables = "snake_case"
+test_cases = "snake_case"
+prefixes = ["t", "e", "tc"]   # [] to allow none
+```
+
+Each case is one of `TitleCase`, `camelCase`, `snake_case`, `SCREAMING_CASE`,
+or `off` to not check that kind of name.
+
+To check from the command line, as in CI, run `p-lsp lint`. It checks the P
+files under each path given (the current directory by default), prints each
+problem as `file:line:column: message`, and exits with 1 if it found any:
+
+```sh
+p-lsp lint ./...
+```
+
 ## Editor setup
 
 Open the folder that holds your `.pproj` files (or a parent of them) as the
@@ -204,6 +252,7 @@ there.
 - [x] Merge the full-tree passes behind diagnostics (tuple checks, undefined events and names, empty receives) into one walk, to speed up large files
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
+- [x] Naming style warnings, configurable with `.plint.toml`, with a quick fix that renames the declaration everywhere, and `p-lsp lint` for the command line
 
 ### Grammar ([tree-sitter-p](https://github.com/bencornia/tree-sitter-p))
 
