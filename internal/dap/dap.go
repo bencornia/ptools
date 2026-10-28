@@ -291,7 +291,7 @@ func (s *server) launch(req *godap.LaunchRequest) {
 	s.send(&godap.InitializedEvent{Event: event("initialized")})
 	from := args.Trace
 	if args.TestCase != "" {
-		from = "the bug in " + args.TestCase
+		from = args.TestCase
 	}
 	s.output("console", fmt.Sprintf("Replaying %d steps from %s\n", len(sess.Steps), from))
 }

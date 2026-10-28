@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -92,12 +93,13 @@ func TestTestCase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tracePath, err := TestCase("tcPingPong", project, 100, nil, nil)
+	tracePath, bug, clean, err := TestCase("tcPingPong", project, 100, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := filepath.Join(project, "PCheckerOutput", "prdb", "tcPingPong.trace.json"); tracePath != want {
-		t.Errorf("trace saved as %s, not %s", tracePath, want)
+	clean()
+	if want := filepath.Join(project, "PCheckerOutput", "prdb", "tcPingPong.trace.json"); tracePath != want || !bug {
+		t.Errorf("trace saved as %s, a bug's: %v; want %s", tracePath, bug, want)
 	}
 	steps, err := trace.Load(tracePath)
 	if err != nil {
@@ -110,38 +112,106 @@ func TestTestCase(t *testing.T) {
 		t.Errorf("the schedule isn't saved: %v", err)
 	}
 
-	_, err = TestCase("tcPing", project, 10, nil, nil)
+	_, _, _, err = TestCase("tcPing", project, 10, nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "no test case tcPing; its tests are: tcPingPong") {
 		t.Errorf("checking a test case that doesn't exist: %v", err)
 	}
 
-	// Fix the bug.
+	// Fix the bug: one run is replayed instead.
 	src := filepath.Join(project, "PSrc", "PingPong.p")
 	text, _ := os.ReadFile(src)
 	os.WriteFile(src, []byte(strings.Replace(string(text), "req.n == 3", "req.n == 99", 1)), 0o644)
-	_, err = TestCase("tcPingPong", project, 10, nil, nil)
-	if err == nil || !strings.Contains(err.Error(), "found no bug in tcPingPong in 10 schedules") {
-		t.Errorf("checking a test case with no bug: %v", err)
+	var progress strings.Builder
+	tracePath, bug, clean, err = TestCase("tcPingPong", project, 10, nil, &progress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer clean()
+	if bug {
+		t.Error("a run with no bug is reported as a bug's")
+	}
+	if !strings.Contains(progress.String(), "PChecker found no bug in tcPingPong in 10 schedules; replaying one run of tcPingPong\n") {
+		t.Errorf("progress %q", progress.String())
+	}
+	steps, err = trace.Load(tracePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if last := steps[len(steps)-1]; last.Kind == "AssertionFailure" || last.Log != "got pong 5" {
+		t.Errorf("the run ends with %s %q", last.Kind, last.Log)
 	}
 }
 
-func TestTestOutput(t *testing.T) {
-	// -tc tcPingPong runs tcPingPong2 as well.
+func TestParameterisedTestCase(t *testing.T) {
+	if _, err := exec.LookPath("p"); err != nil {
+		t.Skip("the P compiler isn't installed")
+	}
+	project := t.TempDir()
+	if err := os.CopyFS(project, os.DirFS("../../testdata/params")); err != nil {
+		t.Fatal(err)
+	}
+
+	// Named for all its cases, the one that fails is found.
+	var progress strings.Builder
+	tracePath, bug, clean, err := TestCase("tcHello", project, 10, nil, &progress)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clean()
+	if want := filepath.Join(project, "PCheckerOutput", "prdb", "tcHello___given_2.trace.json"); tracePath != want || !bug {
+		t.Errorf("trace saved as %s, a bug's: %v; want %s", tracePath, bug, want)
+	}
+	if !strings.Contains(progress.String(), "Found a bug in tcHello___given_2; saved its trace and schedule in PCheckerOutput/prdb/tcHello___given_2.*\n") {
+		t.Errorf("progress %q", progress.String())
+	}
+
+	// A case that passes is run once.
+	for name, printed := range map[string]string{"tcHello___given_1": "hello 1", "tcQuiet": "quiet"} {
+		tracePath, bug, clean, err := TestCase(name, project, 10, nil, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		steps, err := trace.Load(tracePath)
+		clean()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if bug || steps[len(steps)-1].Log != printed {
+			t.Errorf("%s: a bug's %v, ending %q", name, bug, steps[len(steps)-1].Log)
+		}
+	}
+
+	_, _, _, err = TestCase("tcHello___given_3", project, 10, nil, nil)
+	if err == nil || !strings.Contains(err.Error(), "its tests are: tcHello___given_0, tcHello___given_1, tcHello___given_2, tcQuiet") {
+		t.Errorf("checking a case that doesn't exist: %v", err)
+	}
+}
+
+func TestTestRuns(t *testing.T) {
+	// -tc tcPingPong runs tcPingPong2 as well, and -tc tcHello all its
+	// cases.
 	out := []byte(`.. Running test cases with prefix 'tcPingPong':
 .. Test case :: tcPingPong
 ..... Writing /out/BugFinding/PingPong_0_0.txt
 ..... Writing /out/BugFinding/PingPong_0_0.trace.json
 ..... Writing /out/BugFinding/PingPong_0_0.schedule
 .. Test case :: tcPingPong2
-..... Writing /out/BugFinding/PingPong_0_1.trace.json
+..... Writing BugFinding/PingPong_0_1.trace.json
+.. Test case :: tcHello___given_0
+..... Found 0 bugs.
+.. Test case :: tcHello___given_1
+..... Writing /out/BugFinding/PingPong_0_3.trace.json
 `)
-	if ran, trace := testOutput(out, "tcPingPong2"); !ran || trace != "/out/BugFinding/PingPong_0_1.trace.json" {
-		t.Errorf("tcPingPong2: ran %v, trace %q", ran, trace)
-	}
-	if ran, trace := testOutput(out, "tcPingPong"); !ran || trace != "/out/BugFinding/PingPong_0_0.trace.json" {
-		t.Errorf("tcPingPong: ran %v, trace %q", ran, trace)
-	}
-	if ran, _ := testOutput(out, "tcPing"); ran {
-		t.Error("ran tcPing")
+	c := &checker{project: "/project"}
+	runs := c.testRuns(out)
+	for name, want := range map[string][]testRun{
+		"tcPingPong":  {{"tcPingPong", "/out/BugFinding/PingPong_0_0.trace.json"}},
+		"tcPingPong2": {{"tcPingPong2", "/project/BugFinding/PingPong_0_1.trace.json"}}, // relative to the project
+		"tcHello":     {{"tcHello___given_0", ""}, {"tcHello___given_1", "/out/BugFinding/PingPong_0_3.trace.json"}},
+		"tcPing":      nil,
+	} {
+		if got := ofTest(runs, name); !slices.Equal(got, want) {
+			t.Errorf("%s: %+v, want %+v", name, got, want)
+		}
 	}
 }

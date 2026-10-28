@@ -91,6 +91,8 @@ type Index struct {
 	Functions map[string]Node
 	// events are the declared events' names.
 	events map[string]bool
+	// enums are the declared enums' constants, by name, with their values.
+	enums map[string]int
 }
 
 // skipped are directories that hold generated code or checker output.
@@ -104,7 +106,7 @@ func Load(root string) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	x := &Index{Root: root, Machines: map[string]*Machine{}, Functions: map[string]Node{}, events: map[string]bool{}}
+	x := &Index{Root: root, Machines: map[string]*Machine{}, Functions: map[string]Node{}, events: map[string]bool{}, enums: map[string]int{}}
 	parser := sitter.NewParser()
 	defer parser.Close()
 	if err := parser.SetLanguage(sitter.NewLanguage(tree_sitter_p.Language())); err != nil {
@@ -215,6 +217,9 @@ func (x *Index) index(f *File) {
 			if name := n.ChildByFieldName("name"); name != nil {
 				x.events[name.Utf8Text(f.Text)] = true
 			}
+			return false
+		case "enum_type_declaration":
+			x.indexEnum(f, n)
 			return false
 		}
 		return true
@@ -345,6 +350,20 @@ func mentionsEvent(in Node, item *sitter.Node, event string) bool {
 // AnyEvent is the name Statement takes for a send whose event is a
 // variable, as in a helper that sends whatever event it's given.
 const AnyEvent = "\x00any event"
+
+// Statements returns every statement in scope that Statement would find,
+// in source order.
+func (x *Index) Statements(scope Node, kind, name string) []Node {
+	var found []Node
+	walk(scope.Node, func(n *sitter.Node) bool {
+		if n.Kind() == kind && x.matches(scope, n, name) {
+			found = append(found, Node{scope.File, n})
+			return false
+		}
+		return true
+	})
+	return found
+}
 
 // Statement finds a statement of the given kind in scope that matches: a
 // send, raise or announce of an event, a goto to a state, a print whose

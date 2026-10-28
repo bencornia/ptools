@@ -339,7 +339,7 @@ func TestLaunchTestCase(t *testing.T) {
 	for _, want := range []string{
 		"Checking tcPingPong, for up to 100 schedules\n",
 		"saved its trace and schedule in PCheckerOutput/prdb/tcPingPong.*\n",
-		"steps from the bug in tcPingPong\n",
+		"steps from tcPingPong\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("console %q lacks %q", out, want)

@@ -37,7 +37,11 @@ project and runs `p check` on it until PChecker finds a bug, exploring up
 to 1000 schedules unless told otherwise, then debugs the bug's trace. It
 saves the trace and its schedule as
 `PCheckerOutput/prdb/<test case>.trace.json` and `.schedule`, so you can
-replay the same bug again, after a fix too.
+replay the same bug again, after a fix too. A parameterised test, such as
+`test param (n in [1, 2]) tcMyTest`, can be given by its own name, to check
+each of its cases (`tcMyTest___n_1`, `tcMyTest___n_2`) in turn, or by a
+case's. If PChecker finds no bug, prdb replays one run of the test instead,
+so a test that passes can be stepped through too.
 
 Or run PChecker yourself:
 

@@ -5,6 +5,7 @@ package session
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -119,7 +120,7 @@ func (s *Session) locate() {
 			}
 
 		case "SendEvent":
-			s.Where[i] = s.statement(m, ms, "send_statement", sourceEvent(step.Event))
+			s.Where[i] = s.send(m, ms, sourceEvent(step.Event), step.Payload)
 		case "RaiseEvent", "MonitorRaiseEvent":
 			if step.Event == "GotoStateEvent" {
 				// How PChecker reports a goto in a monitor.
@@ -185,6 +186,24 @@ func sourceEvent(event string) string {
 // last found in, then in its handler, then anywhere in the machine, since
 // handlers call functions.
 func (s *Session) statement(m *source.Machine, ms *machineState, kind, name string) source.Location {
+	return s.find(m, ms, kind, name, nil)
+}
+
+// send finds a send statement, as statement does, and of the sends of the
+// event in the first scope that has any, the one whose payload agrees best
+// with what was sent: a handler may send the same event in more than one
+// place, with different values.
+func (s *Session) send(m *source.Machine, ms *machineState, event string, payload json.RawMessage) source.Location {
+	return s.find(m, ms, "send_statement", event, payload)
+}
+
+func (s *Session) find(m *source.Machine, ms *machineState, kind, name string, payload json.RawMessage) source.Location {
+	statement := func(scope source.Node, name string) (source.Node, bool) {
+		if payload == nil {
+			return s.Source.Statement(scope, kind, name)
+		}
+		return s.bestSend(scope, name, payload)
+	}
 	if m == nil {
 		return source.Location{}
 	}
@@ -196,7 +215,7 @@ func (s *Session) statement(m *source.Machine, ms *machineState, kind, name stri
 		scopes = append(scopes, ms.handler)
 	}
 	for _, scope := range scopes {
-		if n, ok := s.Source.Statement(scope, kind, name); ok {
+		if n, ok := statement(scope, name); ok {
 			return n.Location()
 		}
 	}
@@ -204,25 +223,41 @@ func (s *Session) statement(m *source.Machine, ms *machineState, kind, name stri
 	// also call, as in StartTimer(timer).
 	functions := append(m.FunctionsInOrder(), s.Source.FunctionsInOrder()...)
 	for _, fn := range functions {
-		if n, ok := s.Source.Statement(fn, kind, name); ok {
+		if n, ok := statement(fn, name); ok {
 			ms.inner, ms.hasInner = fn, true
 			return n.Location()
 		}
 	}
-	if n, ok := s.Source.Statement(m.Node, kind, name); ok {
+	if n, ok := statement(m.Node, name); ok {
 		return n.Location()
 	}
 	// A helper that sends whatever event it's given, as in
 	// send target, e, payload.
 	if kind == "send_statement" {
 		for _, scope := range append(scopes, functions...) {
-			if n, ok := s.Source.Statement(scope, kind, source.AnyEvent); ok {
+			if n, ok := statement(scope, source.AnyEvent); ok {
 				ms.inner, ms.hasInner = scope, true
 				return n.Location()
 			}
 		}
 	}
 	return source.Location{}
+}
+
+// bestSend returns, of the sends of event in scope, the one whose payload
+// agrees best with payload, or the first if none agrees.
+func (s *Session) bestSend(scope source.Node, event string, payload json.RawMessage) (source.Node, bool) {
+	sends := s.Source.Statements(scope, "send_statement", event)
+	if len(sends) == 0 {
+		return source.Node{}, false
+	}
+	best, most := sends[0], -1
+	for _, send := range sends {
+		if agrees, confirmed := s.Source.PayloadAgrees(send, payload); agrees && confirmed > most {
+			best, most = send, confirmed
+		}
+	}
+	return best, true
 }
 
 // Current returns the current step.
@@ -468,8 +503,10 @@ type Options struct {
 	// test case is doing.
 	Progress io.Writer
 	// TestCase, if set, is a test case to check until PChecker finds a
-	// bug, whose trace Open loads in place of path's. The project is then
-	// found from the current directory, unless Project is set.
+	// bug, whose trace Open loads in place of path's, or if none does, one
+	// run of it. A parameterised test can be named for all its cases. The
+	// project is then found from the current directory, unless Project is
+	// set.
 	TestCase string
 	// Schedules is how many schedules to explore for a bug in TestCase:
 	// 1000 by default.
@@ -502,11 +539,12 @@ func Open(path string, opts Options) (s *Session, close func(), err error) {
 		if schedules <= 0 {
 			schedules = 1000
 		}
-		tracePath, err = replay.TestCase(opts.TestCase, project, schedules, opts.Compiler, opts.Progress)
+		found, _, clean, err := replay.TestCase(opts.TestCase, project, schedules, opts.Compiler, opts.Progress)
 		if err != nil {
 			return nil, nil, err
 		}
-		path = tracePath
+		defer clean()
+		tracePath, path = found, found
 	case strings.HasSuffix(path, ".schedule"):
 		replayed, clean, err := replay.Schedule(path, project, opts.Compiler, opts.Progress)
 		if err != nil {

@@ -1,0 +1,7 @@
+<Project>
+<ProjectName>Params</ProjectName>
+<InputFiles>
+	<PFile>./PSrc/</PFile>
+</InputFiles>
+<OutputDir>./PGenerated/</OutputDir>
+</Project>

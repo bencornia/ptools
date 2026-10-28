@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -58,70 +59,126 @@ func Schedule(schedule, project string, compiler []string, progress io.Writer) (
 
 // TestCase compiles the P project in project and checks the test case
 // named name, exploring up to schedules schedules, until PChecker finds a
-// bug. It returns the bug's trace, which it also saves, with its schedule,
-// as PCheckerOutput/prdb/<name>.trace.json and .schedule in the project,
-// for replaying later. If no schedule finds a bug, it returns an error.
-func TestCase(name, project string, schedules int, compiler []string, progress io.Writer) (tracePath string, err error) {
+// bug. A parameterised test can be named for all its cases, which P names
+// <name>___<param>_<value>__<param>_<value>...: they're checked in turn,
+// until one finds a bug. It returns the bug's trace, which it also saves,
+// with its schedule, as PCheckerOutput/prdb/<case>.trace.json and
+// .schedule in the project, for replaying later.
+//
+// If no schedule finds a bug, it replays one schedule of the test case,
+// or of the first of a parameterised test's, with --verbose, and returns
+// that trace, which clean removes, and bug false.
+func TestCase(name, project string, schedules int, compiler []string, progress io.Writer) (tracePath string, bug bool, clean func(), err error) {
 	c, err := newChecker(project, compiler, progress)
 	if err != nil {
-		return "", err
+		return "", false, nil, err
 	}
-	defer c.clean()
+	defer func() {
+		if err != nil {
+			c.clean()
+		}
+	}()
 	dll, err := c.compile()
 	if err != nil {
-		return "", err
+		return "", false, nil, err
 	}
 
 	c.say("Checking %s, for up to %d schedules", name, schedules)
 	out, runErr := c.run("check", dll, "--testcase", name, "--schedules", strconv.Itoa(schedules), "--outdir", filepath.Join(c.dir, "check"))
-	ran, found := testOutput(out, name)
-	switch {
-	case !ran:
+	cases := ofTest(c.testRuns(out), name)
+	if len(cases) == 0 {
 		tests, _ := c.run("check", dll, "--list-tests")
-		return "", fmt.Errorf("the project has no test case %s; its tests are: %s", name, strings.Join(listedTests(tests), ", "))
-	case found == "":
-		if runErr != nil {
-			return "", fmt.Errorf("checking %s: %w", name, runErr)
+		return "", false, nil, fmt.Errorf("the project has no test case %s; its tests are: %s", name, strings.Join(listedTests(tests), ", "))
+	}
+	for _, r := range cases {
+		if r.trace != "" {
+			tracePath, err := c.save(r)
+			return tracePath, true, c.clean, err
 		}
-		return "", fmt.Errorf("PChecker found no bug in %s in %d schedules", name, schedules)
+	}
+	if runErr != nil && !strings.Contains(string(out), "Found 0 bugs") {
+		return "", false, nil, fmt.Errorf("checking %s: %w", name, runErr)
 	}
 
-	saved := filepath.Join(project, "PCheckerOutput", "prdb")
+	one := cases[0].test
+	c.say("PChecker found no bug in %s in %d schedules; replaying one run of %s", name, schedules, one)
+	out, runErr = c.run("check", dll, "--testcase", one, "--schedules", "1", "--verbose", "--outdir", filepath.Join(c.dir, "run"))
+	for _, r := range c.testRuns(out) {
+		if r.test == one && r.trace != "" {
+			return r.trace, false, c.clean, nil
+		}
+	}
+	if runErr == nil {
+		runErr = errors.New("p check wrote no trace")
+	}
+	return "", false, nil, fmt.Errorf("running %s: %w", one, runErr)
+}
+
+// save copies a bug's trace and schedule into the project, and returns
+// where the trace went.
+func (c *checker) save(r testRun) (string, error) {
+	saved := filepath.Join(c.project, "PCheckerOutput", "prdb")
 	if err := os.MkdirAll(saved, 0o755); err != nil {
 		return "", err
 	}
-	tracePath = filepath.Join(saved, name+".trace.json")
-	if err := copyFile(found, tracePath); err != nil {
+	tracePath := filepath.Join(saved, r.test+".trace.json")
+	if err := copyFile(r.trace, tracePath); err != nil {
 		return "", err
 	}
-	schedule := strings.TrimSuffix(found, ".trace.json") + ".schedule"
-	if err := copyFile(schedule, filepath.Join(saved, name+".schedule")); err != nil {
+	schedule := strings.TrimSuffix(r.trace, ".trace.json") + ".schedule"
+	if err := copyFile(schedule, filepath.Join(saved, r.test+".schedule")); err != nil {
 		return "", err
 	}
-	rel, _ := filepath.Rel(project, saved)
-	c.say("Found a bug; saved its trace and schedule in %s", filepath.Join(rel, name)+".*")
+	rel, _ := filepath.Rel(c.project, saved)
+	c.say("Found a bug in %s; saved its trace and schedule in %s", r.test, filepath.Join(rel, r.test)+".*")
 	return tracePath, nil
 }
 
-// testOutput reads p check's output for whether it ran the test case
-// name, and the trace it wrote for it if it found a bug. -tc runs every
-// test case whose name starts with the one given, each under a
-// ".. Test case :: <name>" heading.
-func testOutput(out []byte, name string) (ran bool, trace string) {
-	current := ""
+// testRun is a test case p check ran, and the trace it wrote, if any.
+type testRun struct {
+	test, trace string
+}
+
+// testRuns reads p check's output for the test cases it ran, each under a
+// ".. Test case :: <name>" heading, and the trace each wrote: of a bug, or
+// with --verbose, of every schedule.
+func (c *checker) testRuns(out []byte) []testRun {
+	var runs []testRun
 	scanner := bufio.NewScanner(bytes.NewReader(out))
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 		if test, ok := strings.CutPrefix(line, ".. Test case :: "); ok {
-			current = strings.TrimSpace(test)
-			ran = ran || current == name
+			runs = append(runs, testRun{test: strings.TrimSpace(test)})
 			continue
 		}
-		if path, ok := strings.CutPrefix(line, "..... Writing "); ok && current == name && trace == "" && strings.HasSuffix(path, ".trace.json") {
-			trace = path
+		if path, ok := strings.CutPrefix(line, "..... Writing "); ok && len(runs) > 0 && strings.HasSuffix(path, ".trace.json") {
+			if last := &runs[len(runs)-1]; last.trace == "" {
+				if !filepath.IsAbs(path) {
+					path = filepath.Join(c.project, path)
+				}
+				last.trace = path
+			}
 		}
 	}
-	return ran, trace
+	return runs
+}
+
+// ofTest picks the runs of the test case name: the one so named, or else
+// a parameterised test's cases. -tc runs every test case whose name starts
+// with the one given, so others may have run too.
+func ofTest(runs []testRun, name string) []testRun {
+	for _, r := range runs {
+		if r.test == name {
+			return []testRun{r}
+		}
+	}
+	var cases []testRun
+	for _, r := range runs {
+		if strings.HasPrefix(r.test, name+"___") {
+			cases = append(cases, r)
+		}
+	}
+	return cases
 }
 
 // listedTests reads the test cases from p check --list-tests.
@@ -212,7 +269,7 @@ func (c *checker) compile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return checkerDLL(build, strings.TrimSuffix(filepath.Base(c.pproj), ".pproj"))
+	return checkerDLL(build, projectName(c.pproj))
 }
 
 // findCompiler finds the P tool, name, and the environment to run it in.
@@ -241,6 +298,18 @@ func findCompiler(name string) (command string, env []string, err error) {
 	}
 	return "", nil, fmt.Errorf("replaying a schedule needs the P compiler, and %q isn't on the PATH; set the launch configuration's compiler to the command that runs it", name)
 }
+
+// projectName returns the name the compiler gives a project's assembly:
+// its <ProjectName>, or else the .pproj file's name.
+func projectName(pproj string) string {
+	data, _ := os.ReadFile(pproj)
+	if m := projectNameElement.FindSubmatch(data); m != nil {
+		return strings.TrimSpace(string(m[1]))
+	}
+	return strings.TrimSuffix(filepath.Base(pproj), ".pproj")
+}
+
+var projectNameElement = regexp.MustCompile(`<ProjectName>([^<]+)</ProjectName>`)
 
 // checkerDLL finds the assembly the compiler built for PChecker: the one
 // named after the project, outside obj/.
