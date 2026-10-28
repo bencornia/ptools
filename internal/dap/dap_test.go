@@ -230,8 +230,14 @@ func TestSession(t *testing.T) {
 	if frames[0].Line != 46 || frames[0].Column != 13 {
 		t.Errorf("assertion frame %+v", frames[0])
 	}
-	if out := c.output("stdout"); out != "got pong 1\ngot pong 2\ngot pong 4\n" {
+	if out := c.output("stdout"); out != "[22] got pong 1\n[31] got pong 2\n[40] got pong 4\n" {
 		t.Errorf("program output %q", out)
+	}
+
+	// Stepping past the failure stays on it.
+	c.request(&godap.StepInRequest{Request: godap.Request{Command: "stepIn"}, Arguments: godap.StepInArguments{ThreadId: stop.ThreadId}})
+	if again := c.stopped(); again.Reason != "exception" || names[again.ThreadId] != "Client(2)" {
+		t.Errorf("stepping past the failure %+v", again)
 	}
 
 	// Step the client back, to its print.

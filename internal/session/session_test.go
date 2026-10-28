@@ -145,6 +145,11 @@ func TestMachines(t *testing.T) {
 	if got := s.State("Client(2)"); got != "Pinging" {
 		t.Errorf("client state %q", got)
 	}
+	s.Pos = 0 // the monitor was created, and hasn't entered a state
+	if got := s.State("PongsCounted"); got != "Watching" {
+		t.Errorf("monitor's state before it starts %q", got)
+	}
+	s.Pos = 16
 	inbox := s.Inbox("Server(3)")
 	if len(inbox) != 1 || inbox[0].Event != "ePing" || inbox[0].Sender != "Client(2)" {
 		t.Errorf("server inbox %+v", inbox)

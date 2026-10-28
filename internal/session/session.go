@@ -371,10 +371,17 @@ func (s *Session) LastStep(machine string) int {
 	return -1
 }
 
-// State returns the state machine is in at the current step.
+// State returns the state machine is in at the current step: before it
+// enters one, its start state.
 func (s *Session) State(machine string) string {
+	start := ""
 	for i := s.Pos; i >= 0; i-- {
 		step := s.Steps[i]
+		if step.Machine == machine && start == "" {
+			if m := s.Source.Machines[step.MachineType()]; m != nil {
+				start = m.Start
+			}
+		}
 		if step.Machine != machine {
 			continue
 		}
@@ -388,7 +395,7 @@ func (s *Session) State(machine string) string {
 			return step.State
 		}
 	}
-	return ""
+	return start
 }
 
 // Message is an event sent to a machine.

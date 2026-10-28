@@ -289,9 +289,14 @@ func (s *server) setBreakpoints(req *godap.SetBreakpointsRequest) {
 func (s *server) move(step func() bool) {
 	from := s.session.Pos
 	if !step() {
-		if s.session.AtEnd() {
+		switch {
+		case s.session.Current().Kind == "AssertionFailure":
+			// Stay on the failure: it's what the trace is for.
+			s.output("console", "The trace ends at the failed assertion.\n")
+			s.stopped("exception")
+		case s.session.AtEnd():
 			s.send(&godap.TerminatedEvent{Event: event("terminated")})
-		} else {
+		default:
 			s.stopped("entry")
 		}
 		return
@@ -310,14 +315,14 @@ func (s *server) move(step func() bool) {
 	s.stopped(reason)
 }
 
-// writeStep writes a step to the debug console, and a print to the
+// writeStep writes a step to the debug console, or a print to the
 // program's output.
 func (s *server) writeStep(i int) {
-	step := s.session.Steps[i]
-	if step.Kind == "Print" {
-		s.output("stdout", step.Log+"\n")
+	category := "console"
+	if s.session.Steps[i].Kind == "Print" {
+		category = "stdout"
 	}
-	s.output("console", fmt.Sprintf("[%d] %s\n", i+1, step.Log))
+	s.output(category, fmt.Sprintf("[%d] %s\n", i+1, s.session.Steps[i].Log))
 }
 
 func (s *server) output(category, text string) {

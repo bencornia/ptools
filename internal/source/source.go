@@ -55,6 +55,8 @@ func (n Node) text(m *sitter.Node) string {
 type Machine struct {
 	Name string
 	Node
+	// Start is the name of its start state.
+	Start string
 	// States and Functions are the machine's, by name.
 	States    map[string]Node
 	Functions map[string]Node
@@ -225,6 +227,9 @@ func (x *Index) indexMachine(m *Machine) {
 		case "state_declaration":
 			if name := n.ChildByFieldName("name"); name != nil {
 				m.States[m.text(name)] = Node{m.File, n}
+				if isStart(n) {
+					m.Start = m.text(name)
+				}
 			}
 			return false
 		case "p_function_declaration", "foreign_function_declaration":
@@ -235,6 +240,16 @@ func (x *Index) indexMachine(m *Machine) {
 		}
 		return true
 	})
+}
+
+// isStart reports whether a state declaration is marked start.
+func isStart(state *sitter.Node) bool {
+	for i := uint(0); i < state.ChildCount(); i++ {
+		if state.Child(i).Kind() == "start" {
+			return true
+		}
+	}
+	return false
 }
 
 // FunctionsInOrder returns the top-level functions in source order, file by

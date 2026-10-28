@@ -149,6 +149,6 @@ PChecker wrote for it.
 - [ ] Launch from a `.schedule` file, replaying it with `p check --replay -v`
 - [ ] Launch a test case: run `p check` to find a bug, then replay it
 - [ ] Choose which schedule of a `--verbose` trace with several to replay
-- [ ] Try the VS Code debugger in VS Code itself; it's tested against the protocol and a stand-in for VS Code's API
+- [x] Try the VS Code debugger in VS Code itself
 - [ ] Test the Neovim setup
 - [ ] A sequence diagram of a trace, from its vector clocks
