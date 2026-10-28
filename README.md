@@ -232,7 +232,7 @@ VS Code needs an extension to start a language server; a minimal one is in
 cd editors/vscode
 npm install
 npx @vscode/vsce package --skip-license
-code --install-extension p-lsp-0.4.0.vsix
+code --install-extension p-lsp-0.5.0.vsix
 ```
 
 It highlights with the server's semantic tokens. Set `p-lsp.path` if
@@ -244,6 +244,16 @@ Lint warnings show in the files you have open, as in any editor. To see
 them for every P file in the workspace, run **P: Lint Workspace** from the
 Command Palette: it runs `p-lsp lint` and puts what it finds in the
 Problems panel.
+
+Above each test case, **Run test** compiles the project and checks the test
+case with `p check`, in a terminal; if PChecker finds a bug, it offers to
+step through the bug's trace in the debugger. **Debug test** has prdb check
+the test case until PChecker finds a bug, and debugs that. `p.command` sets
+the command that runs the P tool, if it isn't `p` on the `PATH` or in
+`~/.dotnet/tools`, and `p.schedules` how many schedules PChecker explores
+(1000 by default). The lenses come from the server, as `p.runTest` and
+`p.debugTest` commands for the editor to run, so other editors show them
+but need their own handlers to run them.
 
 The extension also runs [prdb](https://github.com/bencornia/prdb), a replay
 debugger for PChecker's traces: with prdb on the `PATH` (or `prdb.path`
@@ -287,6 +297,7 @@ there.
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
 - [x] Naming style warnings, configurable with `.plint.toml`, with a quick fix that renames the declaration everywhere, and `p-lsp lint` for the command line
 - [x] Lint checks: unused declarations, events never sent, unreachable states and code, and shadowed machine variables
+- [x] Run test and Debug test lenses over each test case, run in VS Code with `p check` and prdb
 
 ### Grammar ([tree-sitter-p](https://github.com/bencornia/tree-sitter-p))
 

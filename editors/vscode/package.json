@@ -2,7 +2,7 @@
   "name": "p-lsp",
   "displayName": "P",
   "description": "P language support: the p-lsp language server, pfmt formatting, and the prdb replay debugger",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "publisher": "bencornia",
   "repository": {
     "type": "git",
@@ -62,6 +62,21 @@
           },
           "default": [],
           "description": "Arguments to pass to prdb, such as [\"-v\"] to log the protocol to its standard error."
+        },
+        "p.command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "p"
+          ],
+          "description": "The command that runs the P tool, for running and debugging test cases."
+        },
+        "p.schedules": {
+          "type": "number",
+          "default": 1000,
+          "description": "How many schedules PChecker explores when running or debugging a test case."
         }
       }
     },

@@ -1,10 +1,12 @@
-// Starts p-lsp for P files, and runs prdb to replay PChecker traces, or to
-// debug the bug PChecker finds in a test case.
+// Starts p-lsp for P files, runs the test cases it puts lenses over, and
+// runs prdb to replay PChecker traces, or to debug the bug PChecker finds
+// in a test case.
 const path = require('path');
 const vscode = require('vscode');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { registerDiagram } = require('./diagram');
 const { registerLint } = require('./lint');
+const { registerTests } = require('./tests');
 
 let client;
 
@@ -20,6 +22,7 @@ async function activate(context) {
     );
     registerDiagram(context);
     registerLint(context);
+    registerTests(context, projectOf);
 
     const config = vscode.workspace.getConfiguration('p-lsp');
     client = new LanguageClient(

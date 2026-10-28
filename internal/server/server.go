@@ -81,6 +81,7 @@ func New(version string) *Server {
 		TextDocumentHover:               s.hover,
 		TextDocumentCompletion:          s.completion,
 		TextDocumentCodeAction:          s.codeAction,
+		TextDocumentCodeLens:            s.codeLens,
 		TextDocumentSignatureHelp:       s.signatureHelp,
 		TextDocumentFormatting:          s.formatting,
 		TextDocumentFoldingRange:        s.foldingRange,
