@@ -18,7 +18,8 @@ enum tColor { RED, GREEN }
 
 // Not attached: a blank line follows.
 
-event eLonely;
+event eLonely; // <.>
+event eCallout;
 `
 
 const hoverMain = `machine Client {
@@ -31,6 +32,7 @@ const hoverMain = `machine Client {
       req = (source = s, amount = 1);
       send server, ePing;
       send server, eLonely;
+      send server, eCallout;
       goto Done;
     }
   }
@@ -96,6 +98,7 @@ func TestHover(t *testing.T) {
 		{"tuple value field", "amount = 1", 0, code("amount: int") + "\n\nDeclared in `types.p`, line 3"},
 		{"event with a /* */ comment", "ePing;", 0, code("event ePing;") + "\n\nPayload-free ping.\n\nDeclared in `types.p`, line 6"},
 		{"comment separated by a blank line", "eLonely", 0, code("event eLonely;") + "\n\nDeclared in `types.p`, line 12"},
+		{"a callout on the line above isn't a doc comment", "eCallout", 0, code("event eCallout;") + "\n\nDeclared in `types.p`, line 13"},
 		{"enum element", "RED;", 0, code("enum tColor { RED, GREEN }") + "\n\nDeclared in `types.p`, line 8"},
 		{"global parameter", "color ==", 0, code("param color: tColor")},
 		{"machine", "c: Client", 3, code("machine Client")},

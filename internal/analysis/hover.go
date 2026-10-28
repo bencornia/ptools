@@ -127,7 +127,7 @@ func clip(text string) string {
 
 // docComment returns the comment directly above a top-level or machine-level
 // declaration, with its comment markers removed. Comments separated from the
-// declaration by a blank line don't count.
+// declaration by a blank line, or after code on their line, don't count.
 func docComment(d declaration) string {
 	statement := declaringStatement(d.node)
 	if statement == nil {
@@ -138,6 +138,11 @@ func docComment(d declaration) string {
 	next := statement
 	for prev := next.PrevSibling(); prev != nil && prev.Kind() == "comment"; prev = prev.PrevSibling() {
 		if prev.EndPosition().Row+1 < next.StartPosition().Row {
+			break
+		}
+		if strings.TrimSpace(string(d.doc.Text[lineStart(d.doc, prev.StartByte()):prev.StartByte()])) != "" {
+			// A comment after the code on the line above, like an
+			// asciidoc callout, is about that line.
 			break
 		}
 		comments = append([]string{commentText(prev.Utf8Text(d.doc.Text))}, comments...)
