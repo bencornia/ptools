@@ -60,12 +60,19 @@ async function pickTrace() {
     traces.sort((a, b) => b.mtime - a.mtime);
     const items = traces.map(({ uri, mtime }) => ({
         label: path.basename(uri.fsPath),
-        description: vscode.workspace.asRelativePath(path.dirname(uri.fsPath)),
+        description: traceDirectory(uri),
         detail: new Date(mtime).toLocaleString(),
         uri,
     }));
     const picked = await vscode.window.showQuickPick(items, { placeHolder: 'Trace to replay' });
     return picked?.uri.fsPath;
+}
+
+// traceDirectory names the directory a trace is in, relative to the
+// workspace, and empty at its top.
+function traceDirectory(uri) {
+    const dir = path.dirname(vscode.workspace.asRelativePath(uri));
+    return dir === '.' ? '' : dir;
 }
 
 module.exports = { activate, deactivate, createDebugAdapterDescriptor, resolveDebugConfiguration, pickTrace };
