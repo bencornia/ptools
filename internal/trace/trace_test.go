@@ -66,3 +66,22 @@ func TestParseVerboseTrace(t *testing.T) {
 		t.Errorf("got %+v", steps)
 	}
 }
+
+func TestParseSchedules(t *testing.T) {
+	schedules, err := ParseSchedules([]byte(`[
+		[{"type": "CreateStateMachine", "details": {"id": "A(1)"}}],
+		[{"type": "CreateStateMachine", "details": {"id": "B(1)"}},
+		 {"type": "CreateStateMachine", "details": {"id": "C(2)"}}]
+	]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(schedules) != 2 || len(schedules[0]) != 1 || len(schedules[1]) != 2 || schedules[1][1].Machine != "C(2)" {
+		t.Errorf("got %+v", schedules)
+	}
+	// A bug's trace is one schedule.
+	schedules, err = ParseSchedules([]byte(`[{"type": "CreateStateMachine", "details": {"id": "A(1)"}}]`))
+	if err != nil || len(schedules) != 1 || schedules[0][0].Machine != "A(1)" {
+		t.Errorf("got %+v, %v", schedules, err)
+	}
+}

@@ -87,34 +87,59 @@ type raw struct {
 	} `json:"details"`
 }
 
-// Load reads a trace file.
+// Load reads a trace file. Of a --verbose trace's schedules, it reads the
+// last.
 func Load(path string) ([]Step, error) {
+	schedules, err := LoadSchedules(path)
+	if err != nil {
+		return nil, err
+	}
+	return schedules[len(schedules)-1], nil
+}
+
+// LoadSchedules reads each schedule of a trace file.
+func LoadSchedules(path string) ([][]Step, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	steps, err := Parse(data)
+	schedules, err := ParseSchedules(data)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
 	}
-	return steps, nil
+	return schedules, nil
 }
 
-// Parse reads a trace. It's a list of steps, as PChecker writes for a
-// schedule that found a bug, or with --verbose a list of schedules, of
-// which it reads the last: the one that found a bug, if one did. Entries
-// that describe the checker rather than the program, like the scheduling
-// strategy, are left out.
+// Parse reads a trace. Of a --verbose trace's schedules, it reads the
+// last: the one that found a bug, if one did.
 func Parse(data []byte) ([]Step, error) {
-	var entries []raw
-	if err := json.Unmarshal(data, &entries); err != nil {
-		var schedules [][]raw
-		if json.Unmarshal(data, &schedules) != nil || len(schedules) == 0 {
-			return nil, fmt.Errorf("not a PChecker trace: %w", err)
-		}
-		entries = schedules[len(schedules)-1]
+	schedules, err := ParseSchedules(data)
+	if err != nil {
+		return nil, err
 	}
-	return steps(entries), nil
+	return schedules[len(schedules)-1], nil
+}
+
+// ParseSchedules reads each schedule of a trace. A trace is a list of
+// steps, as PChecker writes for a schedule that found a bug, or with
+// --verbose a list of schedules, one for each it explored. Entries that
+// describe the checker rather than the program, like the scheduling
+// strategy, are left out.
+func ParseSchedules(data []byte) ([][]Step, error) {
+	var entries []raw
+	err := json.Unmarshal(data, &entries)
+	if err == nil {
+		return [][]Step{steps(entries)}, nil
+	}
+	var schedules [][]raw
+	if json.Unmarshal(data, &schedules) != nil || len(schedules) == 0 {
+		return nil, fmt.Errorf("not a PChecker trace: %w", err)
+	}
+	parsed := make([][]Step, len(schedules))
+	for i, entries := range schedules {
+		parsed[i] = steps(entries)
+	}
+	return parsed, nil
 }
 
 func steps(entries []raw) []Step {

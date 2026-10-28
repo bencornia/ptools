@@ -1,8 +1,11 @@
 package session
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -171,5 +174,42 @@ func TestFindProject(t *testing.T) {
 	want, _ := filepath.Abs(fixture)
 	if got := FindProject(filepath.Join(fixture, "PSrc")); got != want {
 		t.Errorf("got %s, want %s", got, want)
+	}
+}
+
+func TestOpenSchedule(t *testing.T) {
+	// A --verbose trace of two schedules: the first ten steps of the bug's,
+	// then all of it.
+	data, err := os.ReadFile(filepath.Join(fixture, "bug.trace.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var steps []json.RawMessage
+	if err := json.Unmarshal(data, &steps); err != nil {
+		t.Fatal(err)
+	}
+	verbose, _ := json.Marshal([][]json.RawMessage{steps[:10], steps})
+	// Beside the project, so Open finds it.
+	path := filepath.Join(t.TempDir(), "verbose.trace.json")
+	os.WriteFile(path, verbose, 0o644)
+	project, _ := filepath.Abs(fixture)
+
+	all := len(open(t).Steps) // the raw steps include the strategy
+	var progress strings.Builder
+	for _, c := range []struct{ schedule, steps int }{{0, all}, {1, 10}, {2, all}} {
+		s, closeSession, err := Open(path, Options{Project: project, Schedule: c.schedule, Progress: &progress})
+		if err != nil {
+			t.Fatal(err)
+		}
+		closeSession()
+		if len(s.Steps) != c.steps {
+			t.Errorf("schedule %d has %d steps, not %d", c.schedule, len(s.Steps), c.steps)
+		}
+	}
+	if !strings.Contains(progress.String(), "verbose.trace.json has 2 schedules; this is schedule 1\n") {
+		t.Errorf("progress %q", progress.String())
+	}
+	if _, _, err := Open(path, Options{Project: project, Schedule: 3}); err == nil || !strings.Contains(err.Error(), "has 2 schedules; there's no schedule 3") {
+		t.Errorf("opening schedule 3: %v", err)
 	}
 }

@@ -25,6 +25,7 @@ func main() {
 	project := flag.String("project", "", "the P project's directory (default: found from the trace's location)")
 	testCase := flag.String("testcase", "", "with -list, check this test case until PChecker finds a bug, and list the bug's trace")
 	schedules := flag.Int("schedules", 1000, "how many schedules -testcase explores for a bug")
+	schedule := flag.Int("schedule", 0, "which of a --verbose trace's schedules to list, from 1 (default: the last)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	verbose := flag.Bool("v", false, "log the protocol messages to stderr")
 	flag.Usage = func() {
@@ -41,7 +42,7 @@ func main() {
 			flag.Usage()
 			os.Exit(2)
 		}
-		opts := session.Options{Project: *project, Progress: os.Stderr, TestCase: *testCase, Schedules: *schedules}
+		opts := session.Options{Project: *project, Progress: os.Stderr, TestCase: *testCase, Schedules: *schedules, Schedule: *schedule}
 		if err := printSteps(flag.Arg(0), opts); err != nil {
 			fmt.Fprintln(os.Stderr, "prdb:", err)
 			os.Exit(1)

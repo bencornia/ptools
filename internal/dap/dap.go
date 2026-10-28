@@ -41,6 +41,9 @@ type LaunchArguments struct {
 	// Schedules is how many schedules to explore for a bug in TestCase:
 	// 1000 by default.
 	Schedules int `json:"schedules"`
+	// Schedule picks which of a --verbose trace's schedules to replay,
+	// counting from 1; the last by default.
+	Schedule int `json:"schedule"`
 	// Compiler runs the P tool, to replay a schedule or check a test case;
 	// "p" by default.
 	Compiler []string `json:"compiler"`
@@ -248,7 +251,7 @@ func (s *server) launch(req *godap.LaunchRequest) {
 	}
 	sess, closeSession, err := session.Open(args.Trace, session.Options{
 		Project: args.Project, Compiler: args.Compiler, Progress: consoleWriter{s},
-		TestCase: args.TestCase, Schedules: args.Schedules,
+		TestCase: args.TestCase, Schedules: args.Schedules, Schedule: args.Schedule,
 	})
 	if err != nil {
 		s.fail(req, err.Error())

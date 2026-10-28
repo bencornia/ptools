@@ -449,6 +449,10 @@ type Options struct {
 	// Schedules is how many schedules to explore for a bug in TestCase:
 	// 1000 by default.
 	Schedules int
+	// Schedule picks which of a --verbose trace's schedules to load,
+	// counting from 1. By default it's the last, the one that found a bug
+	// if one did.
+	Schedule int
 }
 
 // Open loads a trace, or a .schedule file replayed into one, or the bug
@@ -486,10 +490,22 @@ func Open(path string, opts Options) (s *Session, close func(), err error) {
 		defer clean()
 		tracePath = replayed
 	}
-	steps, err := trace.Load(tracePath)
+	schedules, err := trace.LoadSchedules(tracePath)
 	if err != nil {
 		return nil, nil, err
 	}
+	n := len(schedules)
+	if opts.Schedule < 0 || opts.Schedule > n {
+		return nil, nil, fmt.Errorf("%s has %d schedules; there's no schedule %d", path, n, opts.Schedule)
+	}
+	pick := n
+	if opts.Schedule > 0 {
+		pick = opts.Schedule
+	}
+	if n > 1 && opts.Progress != nil {
+		fmt.Fprintf(opts.Progress, "%s has %d schedules; this is schedule %d\n", filepath.Base(path), n, pick)
+	}
+	steps := schedules[pick-1]
 	if len(steps) == 0 {
 		return nil, nil, fmt.Errorf("%s has no steps", path)
 	}
