@@ -70,6 +70,28 @@
         "language": "p"
       }
     ],
+    "commands": [
+      {
+        "command": "prdb.showDiagram",
+        "title": "Show Trace Diagram",
+        "category": "P",
+        "icon": "$(type-hierarchy)"
+      }
+    ],
+    "menus": {
+      "debug/toolBar": [
+        {
+          "command": "prdb.showDiagram",
+          "when": "debugType == 'prdb'"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "prdb.showDiagram",
+          "when": "debugType == 'prdb'"
+        }
+      ]
+    },
     "debuggers": [
       {
         "type": "prdb",

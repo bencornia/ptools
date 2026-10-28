@@ -167,6 +167,9 @@ on save, add `"[p]": { "editor.formatOnSave": true }` to `settings.json`.
 The extension also runs [prdb](https://github.com/bencornia/prdb), a replay
 debugger for PChecker's traces: with prdb on the `PATH` (or `prdb.path`
 set), start debugging in a `.p` file and pick a trace to step through.
+While debugging, the toolbar's Show Trace Diagram button opens the trace's
+diagram beside the editor, following the current step; click a step to go
+there.
 
 ## TODO
 

@@ -3,6 +3,7 @@
 const path = require('path');
 const vscode = require('vscode');
 const { LanguageClient } = require('vscode-languageclient/node');
+const { registerDiagram } = require('./diagram');
 
 let client;
 
@@ -16,6 +17,7 @@ async function activate(context) {
         vscode.commands.registerCommand('prdb.pickTrace', pickTrace),
         vscode.commands.registerCommand('prdb.pickTestCase', pickTestCase),
     );
+    registerDiagram(context);
 
     const config = vscode.workspace.getConfiguration('p-lsp');
     client = new LanguageClient(
