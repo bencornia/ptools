@@ -75,6 +75,9 @@ type Checks struct {
 	UnreachableCode Level `toml:"unreachable_code"`
 	// Shadowing of a machine variable by a parameter or local variable.
 	Shadowing Level `toml:"shadowing"`
+	// Order of a machine's states, the start state first, and of a
+	// state's entry and exit handlers, entry first.
+	Order Level `toml:"order"`
 }
 
 // Config is a .plint.toml file.
@@ -95,6 +98,7 @@ func Default() Config {
 		UnreachableStates: LevelWarning,
 		UnreachableCode:   LevelWarning,
 		Shadowing:         LevelWarning,
+		Order:             LevelWarning,
 	}, Naming: Naming{
 		Types:         TitleCase,
 		EnumConstants: ScreamingCase,
@@ -127,7 +131,7 @@ func Load(path string) (Config, error) {
 		}
 	}
 	k := c.Checks
-	for _, level := range []Level{k.Unused, k.NeverSent, k.UnreachableStates, k.UnreachableCode, k.Shadowing} {
+	for _, level := range []Level{k.Unused, k.NeverSent, k.UnreachableStates, k.UnreachableCode, k.Shadowing, k.Order} {
 		if level != LevelWarning && level != LevelError && level != LevelOff {
 			return Default(), fmt.Errorf("%s: unknown level %q; use warning, error or off", path, level)
 		}

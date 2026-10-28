@@ -92,6 +92,39 @@ func TestChecksAcrossWorkspace(t *testing.T) {
 	}
 }
 
+func TestChecksOrder(t *testing.T) {
+	doc := parse(t, `event Go;
+machine M {
+  state Waiting {
+    exit { }
+    on Go goto Running;
+    entry { send this, Go; }
+  }
+  start state Running {
+    entry setup;
+    exit { goto Waiting; }
+  }
+  fun setup() { }
+}
+spec S observes Go {
+  state Late { exit done; entry done; }
+  start state Early { on Go goto Late; }
+  fun done() { }
+}
+`)
+	checks := style.Checks{Order: style.LevelWarning}
+	got := checkMessages(Checks([]*Document{doc}, doc, checks))
+	want := []string{
+		"6:5 order: `entry` should come before `exit`, on line 4",
+		"8:15 order: the start state `Running` should come first, before `Waiting`",
+		"15:27 order: `entry` should come before `exit`, on line 15",
+		"16:15 order: the start state `Early` should come first, before `Late`",
+	}
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
 func TestChecksLevels(t *testing.T) {
 	doc := parse(t, checksSource)
 	checks := style.Checks{

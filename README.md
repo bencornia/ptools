@@ -116,6 +116,7 @@ Besides naming, p-lsp warns about:
 | Unreachable states | `unreachable_states` | States that no chain of `goto`s leads to from the start state. |
 | Unreachable code | `unreachable_code` | Statements after a `return`, `raise`, `goto`, `break` or `continue`, or after an `if` whose branches all leave. |
 | Shadowing | `shadowing` | Parameters and local variables that hide a machine variable. |
+| Order | `order` | A start state that isn't its machine's first state, and an `entry` handler after its state's `exit`. |
 
 Uses are counted by name, so a check can miss an unused declaration whose
 name is also used for something else, but it won't report one that's
@@ -129,6 +130,7 @@ never_sent = "warning"
 unreachable_states = "error"
 unreachable_code = "warning"
 shadowing = "off"
+order = "warning"
 ```
 
 To check from the command line, as in CI, run `p-lsp lint`. It checks the P

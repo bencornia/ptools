@@ -17,11 +17,13 @@ const (
 	UnreachableStateCode = "unreachable-state"
 	UnreachableCodeCode  = "unreachable-code"
 	ShadowingCode        = "shadowing"
+	OrderCode            = "order"
 )
 
 // Checks returns what the checks turned on in checks find in doc: unused
 // declarations, events nothing sends, states that can't be reached, code
-// that can't run, and machine variables hidden by local names. Whether a
+// that can't run, machine variables hidden by local names, and start
+// states and entry handlers out of order. Whether a
 // global name is used is decided across workspace, the documents that can
 // use what doc declares.
 //
@@ -193,6 +195,7 @@ func (c *checker) machine(decl *sitter.Node) {
 	}
 	c.scopes(decl, machineVariables)
 	c.unreachableStates(decl, body)
+	c.order(body)
 	if decl.Kind() != "impl_machine_declaration" {
 		c.observed(decl)
 	}
@@ -275,6 +278,45 @@ func (c *checker) unreachableStates(machine, body *sitter.Node) {
 		if !reached[name] {
 			c.report(c.checks.UnreachableStates, UnreachableStateCode, c.doc.Range(states[name].ChildByFieldName("name")), true,
 				"state `%s` can't be reached from the start state `%s`", name, start)
+		}
+	}
+}
+
+// order reports a start state that isn't the machine's first state, and
+// an entry handler after its state's exit handler: a machine reads in the
+// order it runs.
+func (c *checker) order(body *sitter.Node) {
+	var first string
+	started := false
+	for _, entry := range namedChildren(body) {
+		if entry.NamedChildCount() == 0 || entry.NamedChild(0).Kind() != "state_declaration" {
+			continue
+		}
+		state := entry.NamedChild(0)
+		name := state.ChildByFieldName("name")
+		if name == nil || name.IsMissing() {
+			continue
+		}
+		isStart := firstTokenOfKind(state, "start") != nil
+		if first == "" {
+			first = c.text(name)
+		} else if isStart && !started {
+			// The compiler reports a second start state.
+			c.report(c.checks.Order, OrderCode, c.doc.Range(name), false,
+				"the start state `%s` should come first, before `%s`", c.text(name), first)
+		}
+		started = started || isStart
+		var exit *sitter.Node
+		for _, item := range namedChildren(state) {
+			switch item.Kind() {
+			case "state_exit_anon", "state_exit_fun":
+				exit = item
+			case "state_entry_anon", "state_entry_fun":
+				if exit != nil {
+					c.report(c.checks.Order, OrderCode, c.doc.Range(item.Child(0)), false,
+						"`entry` should come before `exit`, on line %d", exit.StartPosition().Row+1)
+				}
+			}
 		}
 	}
 }
