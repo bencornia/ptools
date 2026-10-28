@@ -144,7 +144,9 @@ func tokenize(src []byte, tree *sitter.Tree) ([]token, error) {
 }
 
 // separated reports whether n goes after a blank line: a state after
-// another state, or an exit handler right after an entry handler.
+// another state, an exit handler right after an entry handler, or a
+// state's handler, defer or ignore after another, if either takes more
+// than one line. One-line items stay together.
 func separated(n *sitter.Node) bool {
 	prev := n.PrevNamedSibling()
 	for prev != nil && prev.Kind() == "comment" {
@@ -156,10 +158,25 @@ func separated(n *sitter.Node) bool {
 	switch n.Kind() {
 	case "machine_entry":
 		return isState(n) && isState(prev)
-	case "state_exit_anon", "state_exit_fun":
-		return prev.Kind() == "state_entry_anon" || prev.Kind() == "state_entry_fun"
 	}
-	return false
+	if !stateItems[n.Kind()] || !stateItems[prev.Kind()] {
+		return false
+	}
+	isExit := n.Kind() == "state_exit_anon" || n.Kind() == "state_exit_fun"
+	isEntry := prev.Kind() == "state_entry_anon" || prev.Kind() == "state_entry_fun"
+	return isExit && isEntry || multiline(n) || multiline(prev)
+}
+
+// stateItems are the kinds of node in a state's body.
+var stateItems = map[string]bool{
+	"state_entry_anon": true, "state_entry_fun": true, "state_exit_anon": true, "state_exit_fun": true,
+	"state_defer": true, "state_ignore": true,
+	"on_event_do_action_with_fun": true, "on_event_do_action_with_anon": true,
+	"on_event_goto_state": true, "on_event_goto_state_with_anon": true, "on_event_goto_state_with_fun": true,
+}
+
+func multiline(n *sitter.Node) bool {
+	return n.EndPosition().Row > n.StartPosition().Row
 }
 
 func isState(entry *sitter.Node) bool {
