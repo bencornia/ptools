@@ -18,7 +18,8 @@
   ],
   "main": "./extension.js",
   "activationEvents": [
-    "onCommand:prdb.pickTrace"
+    "onCommand:prdb.pickTrace",
+    "onCommand:prdb.pickTestCase"
   ],
   "contributes": {
     "languages": [
@@ -77,13 +78,11 @@
           "p"
         ],
         "variables": {
-          "pickTrace": "prdb.pickTrace"
+          "pickTrace": "prdb.pickTrace",
+          "pickTestCase": "prdb.pickTestCase"
         },
         "configurationAttributes": {
           "launch": {
-            "required": [
-              "trace"
-            ],
             "properties": {
               "trace": {
                 "type": "string",
@@ -92,17 +91,27 @@
               },
               "project": {
                 "type": "string",
-                "description": "The P project's directory. By default, the nearest directory with a .pproj file, from the trace's up."
+                "description": "The P project's directory. By default, the nearest directory with a .pproj file, from the trace's up, or for a test case, from the file that declares it."
               },
               "stopOnEntry": {
                 "type": "boolean",
                 "description": "Stop at the first step, rather than running to the first breakpoint.",
                 "default": true
               },
+              "testcase": {
+                "type": "string",
+                "description": "In place of trace, a test case for PChecker to check until it finds a bug, whose trace to debug. prdb saves the bug's trace and schedule in PCheckerOutput/prdb. ${command:pickTestCase} picks one from the workspace.",
+                "default": "${command:pickTestCase}"
+              },
+              "schedules": {
+                "type": "number",
+                "description": "How many schedules PChecker explores for a bug in testcase.",
+                "default": 1000
+              },
               "compiler": {
                 "type": "array",
                 "items": { "type": "string" },
-                "description": "The command that runs the P tool, to replay a schedule.",
+                "description": "The command that runs the P tool, to replay a schedule or check a test case.",
                 "default": ["p"]
               }
             }
@@ -125,6 +134,16 @@
               "request": "launch",
               "name": "Replay a P trace",
               "trace": "^\"\\${command:pickTrace}\""
+            }
+          },
+          {
+            "label": "P: Find a bug in a test case",
+            "description": "Check a test case with PChecker until it finds a bug, and step through the bug with prdb",
+            "body": {
+              "type": "prdb",
+              "request": "launch",
+              "name": "Find a bug in a P test case",
+              "testcase": "^\"\\${command:pickTestCase}\""
             }
           }
         ]
