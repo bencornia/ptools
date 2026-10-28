@@ -3,7 +3,8 @@ module github.com/bencornia/p-lsp
 go 1.24.3
 
 require (
-	github.com/bencornia/pfmt v0.0.0-20261027211827-6198f0574dae
+	github.com/BurntSushi/toml v1.5.0
+	github.com/bencornia/pfmt v0.0.0-20261028142350-f799895e073f
 	github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a
 	github.com/tliron/commonlog v0.2.8
 	github.com/tliron/glsp v0.2.2
@@ -11,7 +12,6 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/iancoleman/strcase v0.3.0 // indirect
