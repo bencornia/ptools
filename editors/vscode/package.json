@@ -103,6 +103,10 @@
                 "description": "In place of trace, a test case for PChecker to check until it finds a bug, whose trace to debug. prdb saves the bug's trace and schedule in PCheckerOutput/prdb. ${command:pickTestCase} picks one from the workspace.",
                 "default": "${command:pickTestCase}"
               },
+              "schedule": {
+                "type": "number",
+                "description": "Which of a --verbose trace's schedules to replay, counting from 1. Without it, a trace with several asks which."
+              },
               "schedules": {
                 "type": "number",
                 "description": "How many schedules PChecker explores for a bug in testcase.",

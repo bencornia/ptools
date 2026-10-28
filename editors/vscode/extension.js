@@ -74,7 +74,8 @@ async function resolveDebugConfiguration(folder, config) {
 }
 
 // Gives a test case the project it's declared in, unless the configuration
-// names one.
+// names one, and asks which schedule of a --verbose trace with several to
+// replay, unless it names one.
 async function resolveDebugConfigurationWithSubstitutedVariables(folder, config) {
     if (config.testcase && !config.project) {
         const test = (await testCases()).find((t) => t.name === config.testcase);
@@ -82,7 +83,48 @@ async function resolveDebugConfigurationWithSubstitutedVariables(folder, config)
             config.project = test.project;
         }
     }
+    if (config.trace?.endsWith('.trace.json') && config.schedule === undefined) {
+        const file = path.resolve(folder?.uri.fsPath ?? '', config.trace);
+        const schedule = await pickSchedule(vscode.Uri.file(file));
+        if (schedule === null) {
+            return undefined;
+        }
+        if (schedule !== undefined) {
+            config.schedule = schedule;
+        }
+    }
     return config;
+}
+
+// pickSchedule asks which of a --verbose trace's schedules to replay, last
+// first, as that's the one that found the bug if one did. It returns the
+// schedule's number, counting from 1, undefined if the trace has only one,
+// or null if none was picked.
+async function pickSchedule(uri) {
+    let schedules;
+    try {
+        schedules = JSON.parse(new TextDecoder().decode(await vscode.workspace.fs.readFile(uri)));
+    } catch {
+        return undefined; // prdb reports what's wrong with it
+    }
+    if (!Array.isArray(schedules) || !Array.isArray(schedules[0]) || schedules.length < 2) {
+        return undefined;
+    }
+    const items = schedules
+        .map((steps, i) => {
+            const program = steps.filter((step) => step.type !== 'StrategyDescription');
+            return {
+                label: `Schedule ${i + 1}`,
+                description: `${program.length} steps`,
+                detail: program.at(-1)?.details?.log,
+                schedule: i + 1,
+            };
+        })
+        .reverse();
+    const picked = await vscode.window.showQuickPick(items, {
+        placeHolder: `${path.basename(uri.fsPath)} has ${schedules.length} schedules: which to replay?`,
+    });
+    return picked ? picked.schedule : null;
 }
 
 // Asks which of the workspace's PChecker traces or schedules to replay,
