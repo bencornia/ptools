@@ -76,7 +76,7 @@ type Checks struct {
 	// Shadowing of a machine variable by a parameter or local variable.
 	Shadowing Level `toml:"shadowing"`
 	// Order of a machine's states, the start state first, and of a
-	// state's entry and exit handlers, entry first.
+	// state's handlers: entry, then exit, then the rest.
 	Order Level `toml:"order"`
 }
 

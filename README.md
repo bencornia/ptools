@@ -116,12 +116,12 @@ Besides naming, p-lsp warns about:
 | Unreachable states | `unreachable_states` | States that no chain of `goto`s leads to from the start state. |
 | Unreachable code | `unreachable_code` | Statements after a `return`, `raise`, `goto`, `break` or `continue`, or after an `if` whose branches all leave. |
 | Shadowing | `shadowing` | Parameters and local variables that hide a machine variable. |
-| Order | `order` | A start state that isn't its machine's first state, and an `entry` handler after its state's `exit`. |
+| Order | `order` | A start state that isn't its machine's first state, and a state's `entry` and `exit` out of order: `entry` first, then `exit`, then its other handlers, `defer`s and `ignore`s. |
 
 Most come with a quick fix: an unused declaration can be removed (just its
 name, from a list like `var a, b: int;`), as can unreachable code and an
-unreachable state nothing refers to, and an out-of-order start state or
-`entry` can be moved into place. Events never sent and shadowing have no
+unreachable state nothing refers to, and an out-of-order start state,
+`entry` or `exit` can be moved into place. Events never sent and shadowing have no
 fix, since only you know what was meant.
 
 Uses are counted by name, so a check can miss an unused declaration whose

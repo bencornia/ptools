@@ -182,6 +182,16 @@ func TestOrderFixes(t *testing.T) {
 		want:  "machine M {\n  start state S { entry f; exit f;\n  }\n  fun f() { }\n}\n",
 		title: "Move `entry` before `exit`",
 	}, {
+		name:  "entry after a handler",
+		src:   "machine M {\n  start state S {\n    on e goto S;\n    defer d;\n\n    entry {\n    }\n  }\n}\n",
+		want:  "machine M {\n  start state S {\n    entry {\n    }\n    on e goto S;\n    defer d;\n  }\n}\n",
+		title: "Move `entry` before the `on` on line 3",
+	}, {
+		name:  "exit after an ignore",
+		src:   "machine M { start state S { entry f; ignore i; exit f; } fun f() { } }\n",
+		want:  "machine M { start state S { entry f; exit f; ignore i; } fun f() { } }\n",
+		title: "Move `exit` before the `ignore` on line 1",
+	}, {
 		name:  "start state on one line",
 		src:   "machine M { state A { } start state B { goto A; } }\n",
 		want:  "machine M { start state B { goto A; } state A { } }\n",
@@ -228,7 +238,7 @@ func TestRemovalFixes(t *testing.T) {
 		title: "Remove the unused variable `a`",
 		want:  "machine M {\n  var b: int;\n  start state S { entry { b = 1; } }\n}\n",
 	}, {
-		src:   "machine M {\n  start state S { }\n  fun helper() {\n    print \"x\";\n  }\n}\n",
+		src:   "machine M {\n  start state S { }\n\n  fun helper() {\n    print \"x\";\n  }\n}\n",
 		title: "Remove the unused function `helper`",
 		want:  "machine M {\n  start state S { }\n}\n",
 	}, {

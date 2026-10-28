@@ -353,7 +353,7 @@ func (c *checker) unreachableStates(machine, body *sitter.Node) {
 }
 
 // order reports a start state that isn't the machine's first state, and
-// an entry handler after its state's exit handler: a machine reads in the
+// a state's entry and exit handlers out of order: a machine reads in the
 // order it runs. Each comes with a fix that moves it.
 func (c *checker) order(body *sitter.Node) {
 	var first *sitter.Node
@@ -379,18 +379,49 @@ func (c *checker) order(body *sitter.Node) {
 			}
 		}
 		started = started || isStart
-		var exit *sitter.Node
-		for _, item := range namedChildren(state) {
-			switch item.Kind() {
-			case "state_exit_anon", "state_exit_fun":
-				exit = item
-			case "state_entry_anon", "state_entry_fun":
-				if exit != nil && c.report(c.checks.Order, OrderCode, c.doc.Range(item.Child(0)), false,
+		c.handlerOrder(state)
+	}
+}
+
+// handlerOrder reports an entry handler after its state's exit handler,
+// and either after the state's other handlers, defers and ignores, which
+// read better after them.
+func (c *checker) handlerOrder(state *sitter.Node) {
+	var exit, other *sitter.Node
+	for _, item := range namedChildren(state) {
+		switch item.Kind() {
+		case "state_exit_anon", "state_exit_fun":
+			if other != nil {
+				c.beforeOther(item, other)
+			}
+			exit = item
+		case "state_entry_anon", "state_entry_fun":
+			if exit != nil {
+				if c.report(c.checks.Order, OrderCode, c.doc.Range(item.Child(0)), false,
 					"`entry` should come before `exit`, on line %d", exit.StartPosition().Row+1) {
 					c.fix("Move `entry` before `exit`", moveBefore(c.doc, item, exit))
 				}
+			} else if other != nil {
+				c.beforeOther(item, other)
+			}
+		case "state_defer", "state_ignore", "on_event_do_action_with_fun", "on_event_do_action_with_anon",
+			"on_event_goto_state", "on_event_goto_state_with_anon", "on_event_goto_state_with_fun":
+			if other == nil {
+				other = item
 			}
 		}
+	}
+}
+
+// beforeOther reports handler, an entry or exit handler, for coming after
+// other, the first of its state's other items, with a fix that moves it
+// before other.
+func (c *checker) beforeOther(handler, other *sitter.Node) {
+	keyword, first := handler.Child(0), other.Child(0)
+	if c.report(c.checks.Order, OrderCode, c.doc.Range(keyword), false,
+		"`%s` should come before `%s`, on line %d", c.text(keyword), c.text(first), other.StartPosition().Row+1) {
+		c.fix(fmt.Sprintf("Move `%s` before the `%s` on line %d", c.text(keyword), c.text(first), other.StartPosition().Row+1),
+			moveBefore(c.doc, handler, other))
 	}
 }
 
@@ -415,7 +446,7 @@ func moveBefore(doc *Document, node, target *sitter.Node) []protocol.TextEdit {
 	deleted := span(from, to)
 	moved := string(text[start:end])
 	if ownsLines(doc, start, end) {
-		moved = string(text[from:to])
+		moved = string(text[lineStart(doc, start):to])
 		if !strings.HasSuffix(moved, "\n") {
 			moved += "\n"
 		}
@@ -436,10 +467,19 @@ func moveBefore(doc *Document, node, target *sitter.Node) []protocol.TextEdit {
 
 // removal returns the span to delete to remove the text from start to
 // end: its lines, if it has them to itself, or else it and the spaces
-// after it.
+// after it. A blank line before its lines goes too, if a blank line or a
+// closing brace comes after them, so as not to leave two blank lines
+// together or one at the end of a block.
 func removal(doc *Document, start, end uint) (uint, uint) {
 	if ownsLines(doc, start, end) {
-		return lineStart(doc, start), nextLine(doc, end)
+		from, to := lineStart(doc, start), nextLine(doc, end)
+		after := strings.TrimLeft(string(doc.Text[to:nextLine(doc, to)]), " \t\r")
+		if from > 0 && (after == "" || after == "\n" || strings.HasPrefix(after, "}")) {
+			if above := lineStart(doc, from-1); strings.TrimSpace(string(doc.Text[above:from])) == "" {
+				from = above
+			}
+		}
+		return from, to
 	}
 	for end < uint(len(doc.Text)) && (doc.Text[end] == ' ' || doc.Text[end] == '\t') {
 		end++
