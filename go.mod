@@ -4,7 +4,7 @@ go 1.24.3
 
 require (
 	github.com/BurntSushi/toml v1.5.0
-	github.com/bencornia/pfmt v0.0.0-20261028143211-ce5fc6b65d08
+	github.com/bencornia/pfmt v0.0.0-20261028170248-ea9f69e4af02
 	github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a
 	github.com/tliron/commonlog v0.2.8
 	github.com/tliron/glsp v0.2.2
