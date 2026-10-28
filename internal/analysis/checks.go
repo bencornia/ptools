@@ -3,6 +3,7 @@ package analysis
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/bencornia/p-lsp/internal/style"
 	protocol "github.com/tliron/glsp/protocol_3_16"
@@ -31,14 +32,7 @@ const (
 // if that use means something else; the checks miss some unused names, but
 // don't report used ones.
 func Checks(workspace []*Document, doc *Document, checks style.Checks) []protocol.Diagnostic {
-	if !slices.Contains(workspace, doc) {
-		workspace = append(slices.Clip(workspace), doc)
-	}
-	c := &checker{workspace: workspace, doc: doc, checks: checks, diagnostics: []protocol.Diagnostic{}}
-	c.declarations(doc.Tree.RootNode())
-	if checks.UnreachableCode != style.LevelOff {
-		c.unreachableCode()
-	}
+	c := check(workspace, doc, checks)
 	slices.SortStableFunc(c.diagnostics, func(a, b protocol.Diagnostic) int {
 		if a.Range.Start.Line != b.Range.Start.Line {
 			return int(a.Range.Start.Line) - int(b.Range.Start.Line)
@@ -48,16 +42,38 @@ func Checks(workspace []*Document, doc *Document, checks style.Checks) []protoco
 	return c.diagnostics
 }
 
+// CheckFixes returns the problems Checks finds that can be fixed, with
+// their fixes: removing what's unused or unreachable, and moving what's
+// out of order.
+func CheckFixes(workspace []*Document, doc *Document, checks style.Checks) []Fix {
+	return check(workspace, doc, checks).fixes
+}
+
+func check(workspace []*Document, doc *Document, checks style.Checks) *checker {
+	if !slices.Contains(workspace, doc) {
+		workspace = append(slices.Clip(workspace), doc)
+	}
+	c := &checker{workspace: workspace, doc: doc, checks: checks, diagnostics: []protocol.Diagnostic{}}
+	c.declarations(doc.Tree.RootNode())
+	if checks.UnreachableCode != style.LevelOff {
+		c.unreachableCode()
+	}
+	return c
+}
+
 type checker struct {
 	workspace   []*Document
 	doc         *Document
 	checks      style.Checks
 	diagnostics []protocol.Diagnostic
+	// fixes holds the fixes for diagnostics that have them.
+	fixes []Fix
 }
 
-// report adds a diagnostic at level, unless the level is off. Unnecessary
-// code is shown faded, in editors that support it.
-func (c *checker) report(level style.Level, code string, rng protocol.Range, unnecessary bool, format string, args ...any) {
+// report adds a diagnostic at level, unless the level is off, and reports
+// whether it did. Unnecessary code is shown faded, in editors that support
+// it.
+func (c *checker) report(level style.Level, code string, rng protocol.Range, unnecessary bool, format string, args ...any) bool {
 	var severity protocol.DiagnosticSeverity
 	switch level {
 	case style.LevelWarning:
@@ -65,7 +81,7 @@ func (c *checker) report(level style.Level, code string, rng protocol.Range, unn
 	case style.LevelError:
 		severity = protocol.DiagnosticSeverityError
 	default:
-		return
+		return false
 	}
 	source := diagnosticSource
 	diagnostic := protocol.Diagnostic{
@@ -79,10 +95,61 @@ func (c *checker) report(level style.Level, code string, rng protocol.Range, unn
 		diagnostic.Tags = []protocol.DiagnosticTag{protocol.DiagnosticTagUnnecessary}
 	}
 	c.diagnostics = append(c.diagnostics, diagnostic)
+	return true
 }
 
+// unused reports a declaration that's never used, with a fix that removes
+// it: the name, from a list of several, or the whole declaration.
 func (c *checker) unused(name *sitter.Node, what string) {
-	c.report(c.checks.Unused, UnusedCode, c.doc.Range(name), true, "%s `%s` is never used", what, c.text(name))
+	if !c.report(c.checks.Unused, UnusedCode, c.doc.Range(name), true, "%s `%s` is never used", what, c.text(name)) {
+		return
+	}
+	title := fmt.Sprintf("Remove the unused %s `%s`", what, c.text(name))
+	decl := c.doc.parent(name)
+	if decl.Kind() == "identifier_list" {
+		decl = c.doc.parent(decl)
+		if names := identifierListNames(decl); len(names) > 1 {
+			c.fix(title, c.removeListed(names, name))
+			return
+		}
+	}
+	for p := c.doc.parent(decl); p != nil && wrappers[p.Kind()]; p = c.doc.parent(decl) {
+		decl = p
+	}
+	c.fix(title, c.remove(withComments(c.doc, decl), decl.EndByte()))
+}
+
+// wrappers are the kinds of node that hold a single declaration, which
+// goes with it.
+var wrappers = map[string]bool{"type_def_declaration": true, "function_declaration": true, "machine_entry": true}
+
+// removeListed returns the edit that removes name from names, the names in
+// a list, with the comma before or after it.
+func (c *checker) removeListed(names []*sitter.Node, name *sitter.Node) []protocol.TextEdit {
+	for i, n := range names {
+		if !sameNode(n, name) {
+			continue
+		}
+		start, end := name.StartByte(), name.EndByte()
+		if i+1 < len(names) {
+			end = names[i+1].StartByte()
+		} else {
+			start = names[i-1].EndByte()
+		}
+		return []protocol.TextEdit{{Range: c.span(start, end), NewText: ""}}
+	}
+	return nil
+}
+
+// remove returns the edit that removes the text from start to end, with
+// its lines if it has them to itself.
+func (c *checker) remove(start, end uint) []protocol.TextEdit {
+	from, to := removal(c.doc, start, end)
+	return []protocol.TextEdit{{Range: c.span(from, to), NewText: ""}}
+}
+
+func (c *checker) span(from, to uint) protocol.Range {
+	return protocol.Range{Start: c.doc.PositionAt(from), End: c.doc.PositionAt(to)}
 }
 
 func (c *checker) text(n *sitter.Node) string {
@@ -275,18 +342,21 @@ func (c *checker) unreachableStates(machine, body *sitter.Node) {
 		queue = append(queue, c.stateTargets(states[name])...)
 	}
 	for _, name := range order {
-		if !reached[name] {
-			c.report(c.checks.UnreachableStates, UnreachableStateCode, c.doc.Range(states[name].ChildByFieldName("name")), true,
-				"state `%s` can't be reached from the start state `%s`", name, start)
+		if !reached[name] && c.report(c.checks.UnreachableStates, UnreachableStateCode, c.doc.Range(states[name].ChildByFieldName("name")), true,
+			"state `%s` can't be reached from the start state `%s`", name, start) &&
+			countIn(c.doc, machine, name) <= 1 {
+			// Only a state nothing refers to can go without breaking a goto.
+			decl := c.doc.parent(states[name])
+			c.fix(fmt.Sprintf("Remove the state `%s`", name), c.remove(withComments(c.doc, decl), decl.EndByte()))
 		}
 	}
 }
 
 // order reports a start state that isn't the machine's first state, and
 // an entry handler after its state's exit handler: a machine reads in the
-// order it runs.
+// order it runs. Each comes with a fix that moves it.
 func (c *checker) order(body *sitter.Node) {
-	var first string
+	var first *sitter.Node
 	started := false
 	for _, entry := range namedChildren(body) {
 		if entry.NamedChildCount() == 0 || entry.NamedChild(0).Kind() != "state_declaration" {
@@ -298,12 +368,15 @@ func (c *checker) order(body *sitter.Node) {
 			continue
 		}
 		isStart := firstTokenOfKind(state, "start") != nil
-		if first == "" {
-			first = c.text(name)
+		if first == nil {
+			first = entry
 		} else if isStart && !started {
 			// The compiler reports a second start state.
-			c.report(c.checks.Order, OrderCode, c.doc.Range(name), false,
-				"the start state `%s` should come first, before `%s`", c.text(name), first)
+			firstName := c.text(first.NamedChild(0).ChildByFieldName("name"))
+			if c.report(c.checks.Order, OrderCode, c.doc.Range(name), false,
+				"the start state `%s` should come first, before `%s`", c.text(name), firstName) {
+				c.fix(fmt.Sprintf("Move `%s` before `%s`", c.text(name), firstName), moveBefore(c.doc, entry, first))
+			}
 		}
 		started = started || isStart
 		var exit *sitter.Node
@@ -312,13 +385,96 @@ func (c *checker) order(body *sitter.Node) {
 			case "state_exit_anon", "state_exit_fun":
 				exit = item
 			case "state_entry_anon", "state_entry_fun":
-				if exit != nil {
-					c.report(c.checks.Order, OrderCode, c.doc.Range(item.Child(0)), false,
-						"`entry` should come before `exit`, on line %d", exit.StartPosition().Row+1)
+				if exit != nil && c.report(c.checks.Order, OrderCode, c.doc.Range(item.Child(0)), false,
+					"`entry` should come before `exit`, on line %d", exit.StartPosition().Row+1) {
+					c.fix("Move `entry` before `exit`", moveBefore(c.doc, item, exit))
 				}
 			}
 		}
 	}
+}
+
+// fix adds a fix for the diagnostic just reported.
+func (c *checker) fix(title string, edits []protocol.TextEdit) {
+	c.fixes = append(c.fixes, Fix{Diagnostic: c.diagnostics[len(c.diagnostics)-1], Title: title, Edits: edits})
+}
+
+// moveBefore returns the edits that move node, with the comments on the
+// lines just above it, to before target, a sibling before it. A node on
+// lines of its own moves with them, and onto lines of its own if target
+// has them; otherwise it moves within the line.
+func moveBefore(doc *Document, node, target *sitter.Node) []protocol.TextEdit {
+	text := doc.Text
+	start, end := withComments(doc, node), node.EndByte()
+	at := withComments(doc, target)
+	span := func(from, to uint) protocol.Range {
+		return protocol.Range{Start: doc.PositionAt(from), End: doc.PositionAt(to)}
+	}
+
+	from, to := removal(doc, start, end)
+	deleted := span(from, to)
+	moved := string(text[start:end])
+	if ownsLines(doc, start, end) {
+		moved = string(text[from:to])
+		if !strings.HasSuffix(moved, "\n") {
+			moved += "\n"
+		}
+	}
+
+	var inserted protocol.TextEdit
+	if ownsLines(doc, at, target.EndByte()) {
+		line := lineStart(doc, at)
+		if !ownsLines(doc, start, end) {
+			moved = string(text[line:at]) + moved + "\n"
+		}
+		inserted = protocol.TextEdit{Range: span(line, line), NewText: moved}
+	} else {
+		inserted = protocol.TextEdit{Range: span(at, at), NewText: strings.TrimRight(strings.TrimLeft(moved, " \t"), "\n") + " "}
+	}
+	return []protocol.TextEdit{inserted, {Range: deleted, NewText: ""}}
+}
+
+// removal returns the span to delete to remove the text from start to
+// end: its lines, if it has them to itself, or else it and the spaces
+// after it.
+func removal(doc *Document, start, end uint) (uint, uint) {
+	if ownsLines(doc, start, end) {
+		return lineStart(doc, start), nextLine(doc, end)
+	}
+	for end < uint(len(doc.Text)) && (doc.Text[end] == ' ' || doc.Text[end] == '\t') {
+		end++
+	}
+	return start, end
+}
+
+// withComments returns where node starts, counting the comments on the
+// lines just above it, each on a line of its own.
+func withComments(doc *Document, node *sitter.Node) uint {
+	start, row := node.StartByte(), node.StartPosition().Row
+	for p := node.PrevSibling(); p != nil && p.Kind() == "comment" && p.EndPosition().Row+1 == row; p = p.PrevSibling() {
+		if strings.TrimSpace(string(doc.Text[lineStart(doc, p.StartByte()):p.StartByte()])) != "" {
+			break
+		}
+		start, row = p.StartByte(), p.StartPosition().Row
+	}
+	return start
+}
+
+// ownsLines reports whether the text from start to end has its lines to
+// itself, but for a comment after it.
+func ownsLines(doc *Document, start, end uint) bool {
+	before := doc.Text[lineStart(doc, start):start]
+	after := strings.TrimSpace(string(doc.Text[end:nextLine(doc, end)]))
+	return strings.TrimSpace(string(before)) == "" && (after == "" || strings.HasPrefix(after, "//"))
+}
+
+// nextLine returns the offset where the line after the one holding offset
+// starts, or the end of the text.
+func nextLine(doc *Document, offset uint) uint {
+	if row := int(pointAt(doc, offset).Row) + 1; row < len(doc.lineStarts) {
+		return uint(doc.lineStarts[row])
+	}
+	return uint(len(doc.Text))
 }
 
 // stateTargets returns the names of the states that gotos under node go to.
@@ -390,10 +546,14 @@ func (c *checker) unreachableCode() {
 			return true
 		}
 		rng := protocol.Range{Start: c.doc.Range(dead[0]).Start, End: c.doc.Range(dead[len(dead)-1]).End}
+		var reported bool
 		if leaving.Kind() == "if_statement" || leaving.Kind() == "compound_statement" {
-			c.report(c.checks.UnreachableCode, UnreachableCodeCode, rng, true, "unreachable code: every path through the statement before it leaves")
+			reported = c.report(c.checks.UnreachableCode, UnreachableCodeCode, rng, true, "unreachable code: every path through the statement before it leaves")
 		} else {
-			c.report(c.checks.UnreachableCode, UnreachableCodeCode, rng, true, "unreachable code after `%s`", leaving.Child(0).Kind())
+			reported = c.report(c.checks.UnreachableCode, UnreachableCodeCode, rng, true, "unreachable code after `%s`", leaving.Child(0).Kind())
+		}
+		if reported {
+			c.fix("Remove the unreachable code", c.remove(withComments(c.doc, dead[0]), dead[len(dead)-1].EndByte()))
 		}
 		return true
 	})

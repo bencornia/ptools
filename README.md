@@ -118,6 +118,12 @@ Besides naming, p-lsp warns about:
 | Shadowing | `shadowing` | Parameters and local variables that hide a machine variable. |
 | Order | `order` | A start state that isn't its machine's first state, and an `entry` handler after its state's `exit`. |
 
+Most come with a quick fix: an unused declaration can be removed (just its
+name, from a list like `var a, b: int;`), as can unreachable code and an
+unreachable state nothing refers to, and an out-of-order start state or
+`entry` can be moved into place. Events never sent and shadowing have no
+fix, since only you know what was meant.
+
 Uses are counted by name, so a check can miss an unused declaration whose
 name is also used for something else, but it won't report one that's
 used. Each check's level is `warning` (the default), `error` or `off`, set

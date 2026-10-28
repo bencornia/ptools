@@ -72,8 +72,10 @@ func TestNamingWarningsAndRenameFix(t *testing.T) {
 	}
 
 	// Renaming the type would clash with the machine, so there's no fix.
-	if actions := actionsAt(1, 6); len(actions) != 0 {
-		t.Errorf("offered %q, which clashes with machine Client", actions[0].Title)
+	for _, a := range actionsAt(1, 6) {
+		if strings.HasPrefix(a.Title, "Rename") {
+			t.Errorf("offered %q, which clashes with machine Client", a.Title)
+		}
 	}
 
 	// A .plint.toml above the file changes the style.
@@ -118,5 +120,29 @@ func TestCheckWarnings(t *testing.T) {
 	}
 	if got := checks(); len(got) > 0 {
 		t.Errorf("turned off, checks = %q", got)
+	}
+}
+
+func TestOrderFix(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":   appProject,
+		"App/PSrc/Main.p": "machine Client {\n  state Done { }\n  start state Init {\n    goto Done;\n  }\n}\n",
+	}, client{})
+	main := filepath.Join(root, "App/PSrc/Main.p")
+	open(t, s, root, "App/PSrc/Main.p")
+	at := protocol.Position{Line: 2, Character: 14}
+	result, err := s.codeAction(fakeContext(nil), &protocol.CodeActionParams{
+		TextDocument: protocol.TextDocumentIdentifier{URI: pathToURI(main)},
+		Range:        protocol.Range{Start: at, End: at},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	actions := result.([]protocol.CodeAction)
+	if len(actions) != 1 || actions[0].Title != "Move `Init` before `Done`" {
+		t.Fatalf("actions = %+v", actions)
+	}
+	if got := applyEdits(t, s, main, actions[0].Edit.Changes[pathToURI(main)]); got != "machine Client {\n  start state Init {\n    goto Done;\n  }\n  state Done { }\n}\n" {
+		t.Errorf("fixed = %q", got)
 	}
 }

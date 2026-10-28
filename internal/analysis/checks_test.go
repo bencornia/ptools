@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"testing"
 
@@ -122,6 +123,159 @@ spec S observes Go {
 	}
 	if strings.Join(got, "\n") != strings.Join(want, "\n") {
 		t.Errorf("got\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}
+
+func TestOrderFixes(t *testing.T) {
+	for _, tc := range []struct{ name, src, want, title string }{{
+		name: "start state on its own lines, with its comment",
+		src: `machine M {
+  var x: int;
+  state Waiting {
+    on null goto Running;
+  }
+  // Where it begins.
+  start state Running {
+    entry { goto Waiting; }
+  }
+}
+`,
+		want: `machine M {
+  var x: int;
+  // Where it begins.
+  start state Running {
+    entry { goto Waiting; }
+  }
+  state Waiting {
+    on null goto Running;
+  }
+}
+`,
+		title: "Move `Running` before `Waiting`",
+	}, {
+		name: "entry on its own lines, with a comment after it",
+		src: `machine M {
+  start state S {
+    exit { }
+    ignore null;
+    entry { } // hello
+  }
+}
+`,
+		want: `machine M {
+  start state S {
+    entry { } // hello
+    exit { }
+    ignore null;
+  }
+}
+`,
+		title: "Move `entry` before `exit`",
+	}, {
+		name:  "on one line",
+		src:   "machine M { start state S { exit f; entry f; } fun f() { } }\n",
+		want:  "machine M { start state S { entry f; exit f; } fun f() { } }\n",
+		title: "Move `entry` before `exit`",
+	}, {
+		name:  "onto another's line",
+		src:   "machine M {\n  start state S { exit f;\n    entry f;\n  }\n  fun f() { }\n}\n",
+		want:  "machine M {\n  start state S { entry f; exit f;\n  }\n  fun f() { }\n}\n",
+		title: "Move `entry` before `exit`",
+	}, {
+		name:  "start state on one line",
+		src:   "machine M { state A { } start state B { goto A; } }\n",
+		want:  "machine M { start state B { goto A; } state A { } }\n",
+		title: "Move `B` before `A`",
+	}} {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := parse(t, tc.src)
+			fixes := CheckFixes(nil, doc, style.Checks{Order: style.LevelWarning})
+			if len(fixes) != 1 {
+				t.Fatalf("got %d fixes", len(fixes))
+			}
+			if fixes[0].Title != tc.title {
+				t.Errorf("title %q", fixes[0].Title)
+			}
+			want := Checks([]*Document{doc}, doc, style.Checks{Order: style.LevelWarning})
+			if len(want) != 1 || fixes[0].Diagnostic.Message != want[0].Message || fixes[0].Diagnostic.Range != want[0].Range {
+				t.Errorf("diagnostic %v, Checks reports %v", fixes[0].Diagnostic, want)
+			}
+			if got := applyEdits(t, tc.src, fixes[0].Edits); got != tc.want {
+				t.Errorf("got\n%s\nwant\n%s", got, tc.want)
+			}
+			fixed := parse(t, applyEdits(t, tc.src, fixes[0].Edits))
+			if again := CheckFixes(nil, fixed, style.Checks{Order: style.LevelWarning}); len(again) != 0 {
+				t.Errorf("still out of order: %v", again[0].Diagnostic.Message)
+			}
+		})
+	}
+	if fixes := CheckFixes(nil, parse(t, "machine M { state A { } start state B { } }\n"), style.Checks{}); len(fixes) != 0 {
+		t.Errorf("fixes with the check off: %v", fixes)
+	}
+}
+
+func TestRemovalFixes(t *testing.T) {
+	for _, tc := range []struct{ src, title, want string }{{
+		src:   "// Not needed.\ntype Unused = int;\nevent E;\nmachine M { start state S { entry { send this, E; } } }\n",
+		title: "Remove the unused type `Unused`",
+		want:  "event E;\nmachine M { start state S { entry { send this, E; } } }\n",
+	}, {
+		src:   "machine M {\n  var a, b: int;\n  start state S { entry { a = 1; } }\n}\n",
+		title: "Remove the unused variable `b`",
+		want:  "machine M {\n  var a: int;\n  start state S { entry { a = 1; } }\n}\n",
+	}, {
+		src:   "machine M {\n  var a, b: int;\n  start state S { entry { b = 1; } }\n}\n",
+		title: "Remove the unused variable `a`",
+		want:  "machine M {\n  var b: int;\n  start state S { entry { b = 1; } }\n}\n",
+	}, {
+		src:   "machine M {\n  start state S { }\n  fun helper() {\n    print \"x\";\n  }\n}\n",
+		title: "Remove the unused function `helper`",
+		want:  "machine M {\n  start state S { }\n}\n",
+	}, {
+		src:   "fun f() { var spare: int; print \"x\"; }\n",
+		title: "Remove the unused variable `spare`",
+		want:  "fun f() { print \"x\"; }\n",
+	}, {
+		src:   "param a, b: int;\nfun f(): int { return a; }\n",
+		title: "Remove the unused parameter `b`",
+		want:  "param a: int;\nfun f(): int { return a; }\n",
+	}, {
+		src:   "machine M {\n  start state S {\n    entry {\n      return;\n      // gone\n      print \"a\";\n      print \"b\";\n    }\n  }\n}\n",
+		title: "Remove the unreachable code",
+		want:  "machine M {\n  start state S {\n    entry {\n      return;\n    }\n  }\n}\n",
+	}, {
+		src:   "machine M { start state S { entry { goto S; print \"a\"; } } }\n",
+		title: "Remove the unreachable code",
+		want:  "machine M { start state S { entry { goto S; } } }\n",
+	}, {
+		src:   "machine M {\n  start state S { }\n  state Lonely {\n    on null goto S;\n  }\n}\n",
+		title: "Remove the state `Lonely`",
+		want:  "machine M {\n  start state S { }\n}\n",
+	}} {
+		doc := parse(t, tc.src)
+		fixes := CheckFixes(nil, doc, style.Default().Checks)
+		i := slices.IndexFunc(fixes, func(f Fix) bool { return f.Title == tc.title })
+		if i < 0 {
+			var titles []string
+			for _, f := range fixes {
+				titles = append(titles, f.Title)
+			}
+			t.Errorf("no fix %q in %q", tc.title, titles)
+			continue
+		}
+		if got := applyEdits(t, tc.src, fixes[i].Edits); got != tc.want {
+			t.Errorf("%s: got\n%s\nwant\n%s", tc.title, got, tc.want)
+		}
+	}
+
+	// Removing Orphan would break Lonely's goto.
+	doc := parse(t, checksSource)
+	var titles []string
+	for _, f := range CheckFixes(nil, doc, style.Default().Checks) {
+		titles = append(titles, f.Title)
+	}
+	if !slices.Contains(titles, "Remove the state `Lonely`") || slices.Contains(titles, "Remove the state `Orphan`") {
+		t.Errorf("fixes %q", titles)
 	}
 }
 

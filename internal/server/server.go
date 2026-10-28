@@ -240,7 +240,8 @@ func (s *Server) codeAction(_ *glsp.Context, params *protocol.CodeActionParams) 
 	actions := []protocol.CodeAction{}
 	kind := protocol.CodeActionKindQuickFix
 	preferred := true
-	for _, f := range analysis.Fixes(s.visibleDocs(path), doc) {
+	fixes := append(analysis.Fixes(s.visibleDocs(path), doc), analysis.CheckFixes(s.userDocs(path), doc, s.style(path).Checks)...)
+	for _, f := range fixes {
 		if !overlaps(f.Diagnostic.Range, params.Range) {
 			continue
 		}
