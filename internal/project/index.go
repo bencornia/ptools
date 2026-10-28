@@ -1,6 +1,9 @@
 package project
 
-import "sort"
+import (
+	"slices"
+	"sort"
+)
 
 // Index holds a set of projects and the projects they include.
 type Index struct {
@@ -78,6 +81,37 @@ func (x *Index) Visible(file string) (files []string, ok bool) {
 	if len(owners) == 0 {
 		return nil, false
 	}
+	return x.files(owners), true
+}
+
+// Users returns the files that can use what file declares: those compiled
+// with it, and those compiled with every project that includes one of its
+// projects, directly or through others, as the projects using a library
+// include it. ok is false if no loaded project lists file.
+func (x *Index) Users(file string) (files []string, ok bool) {
+	users := slices.Clone(x.owners[file])
+	if len(users) == 0 {
+		return nil, false
+	}
+	seen := map[string]bool{}
+	for _, p := range users {
+		seen[p.Path] = true
+	}
+	for i := 0; i < len(users); i++ {
+		for _, q := range x.projects {
+			if !seen[q.Path] && slices.Contains(q.Includes, users[i].Path) {
+				seen[q.Path] = true
+				users = append(users, q)
+			}
+		}
+	}
+	return x.files(users), true
+}
+
+// files returns the files of projects and of the projects they include,
+// sorted.
+func (x *Index) files(projects []*Project) []string {
+	var files []string
 	seen := map[string]bool{}
 	visited := map[string]bool{}
 	var visit func(p *Project)
@@ -98,9 +132,9 @@ func (x *Index) Visible(file string) (files []string, ok bool) {
 			}
 		}
 	}
-	for _, p := range owners {
+	for _, p := range projects {
 		visit(p)
 	}
 	sort.Strings(files)
-	return files, true
+	return files
 }

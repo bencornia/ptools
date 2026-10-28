@@ -120,6 +120,18 @@ func TestLoad(t *testing.T) {
 		t.Errorf("Load = %+v", c.Naming)
 	}
 
+	write("[checks]\nunused = \"off\"\nshadowing = \"error\"\n")
+	if c, err = Load(path); err != nil {
+		t.Fatal(err)
+	}
+	if c.Checks.Unused != LevelOff || c.Checks.Shadowing != LevelError || c.Checks.NeverSent != LevelWarning {
+		t.Errorf("Load = %+v", c.Checks)
+	}
+	write("[checks]\nunused = \"warn\"\n")
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "warn") {
+		t.Errorf("unknown level: err = %v", err)
+	}
+
 	write("[naming]\nevents = \"kebab-case\"\n")
 	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "kebab-case") {
 		t.Errorf("unknown case: err = %v", err)

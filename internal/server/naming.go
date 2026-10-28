@@ -9,17 +9,17 @@ import (
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
-// naming returns the naming style for the file at path: from the nearest
-// .plint.toml in its directory or above, or the default. A file that can't
-// be read is logged, once until it changes, and the default used. Callers
-// must hold mu.
-func (s *Server) naming(path string) style.Naming {
+// style returns the lint configuration for the file at path: from the
+// nearest .plint.toml in its directory or above, or the default. A file
+// that can't be read is logged, once until it changes, and the default
+// used. Callers must hold mu.
+func (s *Server) style(path string) style.Config {
 	if !filepath.IsAbs(path) {
-		return style.Default().Naming
+		return style.Default()
 	}
 	file := style.Find(filepath.Dir(path))
 	if file == "" {
-		return style.Default().Naming
+		return style.Default()
 	}
 	config, err := style.Load(file)
 	if err != nil {
@@ -28,12 +28,12 @@ func (s *Server) naming(path string) style.Naming {
 		}
 		if s.styleErrors[file] != err.Error() {
 			s.styleErrors[file] = err.Error()
-			log.Errorf("using the default naming style: %s", err)
+			log.Errorf("using the default lint configuration: %s", err)
 		}
-		return style.Default().Naming
+		return style.Default()
 	}
 	delete(s.styleErrors, file)
-	return config.Naming
+	return config
 }
 
 // renameActions offers to rename each badly named declaration in rng to its
@@ -42,7 +42,7 @@ func (s *Server) naming(path string) style.Naming {
 func (s *Server) renameActions(path string, doc *analysis.Document, rng protocol.Range) []protocol.CodeAction {
 	actions := []protocol.CodeAction{}
 	kind := protocol.CodeActionKindQuickFix
-	for _, p := range analysis.Naming(doc, s.naming(path)) {
+	for _, p := range analysis.Naming(doc, s.style(path).Naming) {
 		if p.Suggestion == "" || !overlaps(p.Diagnostic.Range, rng) {
 			continue
 		}
@@ -67,7 +67,7 @@ func (s *Server) renameActions(path string, doc *analysis.Document, rng protocol
 }
 
 // openDiagnostics returns the diagnostics to republish for every open file,
-// as after its naming style changes. Callers must hold mu.
+// as after its lint configuration changes. Callers must hold mu.
 func (s *Server) openDiagnostics() []protocol.PublishDiagnosticsParams {
 	var notifications []protocol.PublishDiagnosticsParams
 	for path := range s.open {

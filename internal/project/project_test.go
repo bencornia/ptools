@@ -131,6 +131,18 @@ func TestVisible(t *testing.T) {
 		if got, ok := x.Visible(filepath.Join(root, unlisted)); ok {
 			t.Errorf("Visible(%s) = %v, want not ok", unlisted, got)
 		}
+		if got, ok := x.Users(filepath.Join(root, unlisted)); ok {
+			t.Errorf("Users(%s) = %v, want not ok", unlisted, got)
+		}
+	}
+
+	// What the shared project declares can be used by everything that
+	// includes it.
+	got, ok := x.Users(filepath.Join(root, "Common/Timer/PSrc/Timer.p"))
+	want := paths(root, "App/PSrc/Main.p", "App/PSrc/nested/Types.P", "App/PTst/Test.p",
+		"Common/Cycle/Cycle.p", "Common/Timer/PSrc/Timer.p", "Common/Unrelated/U.p")
+	if !ok || !reflect.DeepEqual(got, want) {
+		t.Errorf("Users(Timer.p) = %v, %v\nwant %v", got, ok, want)
 	}
 }
 

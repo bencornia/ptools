@@ -1,7 +1,6 @@
 package server
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -105,39 +104,9 @@ func (s *Server) discoverProject(path string) {
 		return
 	}
 
-	for dir := filepath.Dir(path); ; {
-		if found := projectsListing(dir, path); len(found) > 0 {
-			log.Infof("found %s for %s", strings.Join(found, ", "), path)
-			s.discovered = append(s.discovered, found...)
-			s.reloadWorkspace()
-			return
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return
-		}
-		dir = parent
+	if found := project.Discover(path); len(found) > 0 {
+		log.Infof("found %s for %s", strings.Join(found, ", "), path)
+		s.discovered = append(s.discovered, found...)
+		s.reloadWorkspace()
 	}
-}
-
-// projectsListing returns the .pproj files directly in dir that list file,
-// directly or through the projects they include.
-func projectsListing(dir, file string) []string {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil
-	}
-	var found []string
-	for _, entry := range entries {
-		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".pproj") {
-			continue
-		}
-		pproj := filepath.Join(dir, entry.Name())
-		index := project.NewIndex()
-		index.Load(pproj)
-		if _, ok := index.Visible(file); ok {
-			found = append(found, pproj)
-		}
-	}
-	return found
 }

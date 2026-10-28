@@ -14,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
 // TestMain runs this test binary as the server when a test starts it with
@@ -451,10 +453,11 @@ func TestLint(t *testing.T) {
 	dir := t.TempDir()
 	for name, text := range map[string]string{
 		"PSrc/Events.p":            "event lookup_done;\nevent eGood;\n",
-		"PSrc/Main.p":              "machine Client { start state Init { } }\n",
+		"PSrc/Main.p":              "machine Client { start state Init { entry { send this, lookup_done; send this, eGood; } } }\n",
 		"Other/.hidden/Bad.p":      "event bad;\n",
-		"Other/Styled/.plint.toml": "[naming]\nevents = \"snake_case\"\n",
+		"Other/Styled/.plint.toml": "[naming]\nevents = \"snake_case\"\n[checks]\nunused = \"off\"\n",
 		"Other/Styled/Snake.p":     "event lookup_done;\n",
+		"Other/Loose/Dead.p":       "machine M { start state S { entry { return; print \"x\"; } } }\n",
 	} {
 		path := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -465,9 +468,11 @@ func TestLint(t *testing.T) {
 		}
 	}
 
+	// Events.p's events are sent from Main.p, which is compiled with it.
 	var stdout, stderr strings.Builder
 	status := lint([]string{filepath.Join(dir, "...")}, &stdout, &stderr)
-	want := filepath.Join(dir, "PSrc/Events.p") + ":1:7: event name `lookup_done` should be TitleCase: `LookupDone`\n"
+	want := filepath.Join(dir, "Other/Loose/Dead.p") + ":1:45: unreachable code after `return` (unreachable-code)\n" +
+		filepath.Join(dir, "PSrc/Events.p") + ":1:7: event name `lookup_done` should be TitleCase: `LookupDone` (naming)\n"
 	if status != 1 || stdout.String() != want || stderr.Len() > 0 {
 		t.Errorf("lint = %d, stdout %q, stderr %q; want 1, %q", status, stdout.String(), stderr.String(), want)
 	}
@@ -478,5 +483,21 @@ func TestLint(t *testing.T) {
 	}
 	if status := lint([]string{filepath.Join(dir, "missing.p")}, &stdout, &stderr); status != 2 {
 		t.Errorf("missing file: lint = %d, want 2", status)
+	}
+
+	stdout.Reset()
+	lint([]string{"-json", filepath.Join(dir, "Other/Loose/Dead.p")}, &stdout, &stderr)
+	var problems []struct {
+		File  string
+		Code  string
+		Range protocol.Range
+		Tags  []int
+	}
+	if err := json.Unmarshal([]byte(stdout.String()), &problems); err != nil {
+		t.Fatalf("-json printed %q: %v", stdout.String(), err)
+	}
+	if len(problems) != 1 || problems[0].Code != "unreachable-code" || problems[0].Range.End.Character != 54 ||
+		len(problems[0].Tags) != 1 || !strings.HasSuffix(problems[0].File, "Dead.p") {
+		t.Errorf("-json printed %s", stdout.String())
 	}
 }

@@ -416,6 +416,14 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 	s.replace(path, doc)
 	s.open[path] = true
 	diagnostics := s.diagnosticsFor(path)
+	// What's unused or never sent in the other open files can depend on
+	// this one.
+	var others []protocol.PublishDiagnosticsParams
+	for other := range s.open {
+		if doc, ok := s.docs[other]; ok && other != path {
+			others = append(others, protocol.PublishDiagnosticsParams{URI: doc.URI, Diagnostics: s.diagnosticsFor(other)})
+		}
+	}
 	s.mu.Unlock()
 
 	ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, protocol.PublishDiagnosticsParams{
@@ -423,6 +431,9 @@ func (s *Server) update(ctx *glsp.Context, uri protocol.DocumentUri, version pro
 		Version:     &publishedVersion,
 		Diagnostics: diagnostics,
 	})
+	for _, n := range others {
+		ctx.Notify(protocol.ServerTextDocumentPublishDiagnostics, n)
+	}
 }
 
 // visibleDocs returns the documents compiled together with the one at path,
@@ -444,6 +455,16 @@ func (s *Server) visibleDocs(path string) []*analysis.Document {
 		}
 	}
 	return s.docsAt(paths)
+}
+
+// userDocs returns the documents that can use what the one at path
+// declares: those compiled with it, and for a library, those of the
+// projects including it. Callers must hold mu.
+func (s *Server) userDocs(path string) []*analysis.Document {
+	if paths, ok := s.projects.Users(path); ok {
+		return s.docsAt(paths)
+	}
+	return s.visibleDocs(path)
 }
 
 // allDocs returns every document, sorted by path. Callers must hold mu.

@@ -104,7 +104,7 @@ func (s *Server) compileDiagnostic(path string, e compile.Error) protocol.Diagno
 }
 
 // diagnosticsFor returns everything to show for the file at path: syntax
-// errors and naming warnings while it's open in the editor, and type errors
+// errors and lint warnings while it's open in the editor, and type errors
 // from the last compile of each project. Callers must hold mu.
 func (s *Server) diagnosticsFor(path string) []protocol.Diagnostic {
 	diagnostics := []protocol.Diagnostic{}
@@ -125,7 +125,9 @@ func (s *Server) diagnosticsFor(path string) []protocol.Diagnostic {
 		}
 	}
 	if doc, ok := s.docs[path]; ok && s.open[path] {
-		diagnostics = append(diagnostics, analysis.NamingDiagnostics(doc, s.naming(path))...)
+		config := s.style(path)
+		diagnostics = append(diagnostics, analysis.NamingDiagnostics(doc, config.Naming)...)
+		diagnostics = append(diagnostics, analysis.Checks(s.userDocs(path), doc, config.Checks)...)
 	}
 	return diagnostics
 }

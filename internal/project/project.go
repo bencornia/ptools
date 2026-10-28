@@ -140,6 +140,43 @@ func FallbackRoot(file string) string {
 	}
 }
 
+// Discover searches file's directory and then each parent for .pproj files,
+// and returns those in the first directory that list file, directly or
+// through the projects they include.
+func Discover(file string) []string {
+	for dir := filepath.Dir(file); ; {
+		if found := listing(dir, file); len(found) > 0 {
+			return found
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return nil
+		}
+		dir = parent
+	}
+}
+
+// listing returns the .pproj files directly in dir that list file.
+func listing(dir, file string) []string {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil
+	}
+	var found []string
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.EqualFold(filepath.Ext(entry.Name()), ".pproj") {
+			continue
+		}
+		pproj := filepath.Join(dir, entry.Name())
+		index := NewIndex()
+		index.Load(pproj)
+		if _, ok := index.Visible(file); ok {
+			found = append(found, pproj)
+		}
+	}
+	return found
+}
+
 // Within reports whether path is dir or inside it.
 func Within(path, dir string) bool {
 	rel, err := filepath.Rel(dir, path)

@@ -105,9 +105,37 @@ prefixes = ["t", "e", "tc"]   # [] to allow none
 Each case is one of `TitleCase`, `camelCase`, `snake_case`, `SCREAMING_CASE`,
 or `off` to not check that kind of name.
 
+## Lint checks
+
+Besides naming, p-lsp warns about:
+
+| Check | Setting | What it finds |
+|---|---|---|
+| Unused declarations | `unused` | Types, events, event sets, functions, `param`s, machine variables and local variables nothing refers to. A library's declarations count as used if a project including it uses them. |
+| Events never sent | `never_sent` | Events that are handled, deferred, ignored or observed, but never sent, raised or announced, and the specs observing them. |
+| Unreachable states | `unreachable_states` | States that no chain of `goto`s leads to from the start state. |
+| Unreachable code | `unreachable_code` | Statements after a `return`, `raise`, `goto`, `break` or `continue`, or after an `if` whose branches all leave. |
+| Shadowing | `shadowing` | Parameters and local variables that hide a machine variable. |
+
+Uses are counted by name, so a check can miss an unused declaration whose
+name is also used for something else, but it won't report one that's
+used. Each check's level is `warning` (the default), `error` or `off`, set
+in the same `.plint.toml`:
+
+```toml
+[checks]
+unused = "warning"
+never_sent = "warning"
+unreachable_states = "error"
+unreachable_code = "warning"
+shadowing = "off"
+```
+
 To check from the command line, as in CI, run `p-lsp lint`. It checks the P
-files under each path given (the current directory by default), prints each
-problem as `file:line:column: message`, and exits with 1 if it found any:
+files under each path given (the current directory by default) against the
+files compiled with them, prints each problem as
+`file:line:column: message (check)`, and exits with 1 if it found any.
+`-json` prints them as LSP diagnostics instead, each with its `file`:
 
 ```sh
 p-lsp lint ./...
@@ -204,7 +232,7 @@ VS Code needs an extension to start a language server; a minimal one is in
 cd editors/vscode
 npm install
 npx @vscode/vsce package --skip-license
-code --install-extension p-lsp-0.3.0.vsix
+code --install-extension p-lsp-0.4.0.vsix
 ```
 
 It highlights with the server's semantic tokens. Set `p-lsp.path` if
@@ -212,9 +240,9 @@ It highlights with the server's semantic tokens. Set `p-lsp.path` if
 such as `["-compiler", ""]`. Format Document formats with pfmt; to format
 on save, add `"[p]": { "editor.formatOnSave": true }` to `settings.json`.
 
-Naming warnings show in the files you have open, as in any editor. To see
-them for every P file in the workspace, run **P: Check Naming in Workspace**
-from the Command Palette: it runs `p-lsp lint` and puts what it finds in the
+Lint warnings show in the files you have open, as in any editor. To see
+them for every P file in the workspace, run **P: Lint Workspace** from the
+Command Palette: it runs `p-lsp lint` and puts what it finds in the
 Problems panel.
 
 The extension also runs [prdb](https://github.com/bencornia/prdb), a replay
@@ -258,6 +286,7 @@ there.
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
 - [x] Naming style warnings, configurable with `.plint.toml`, with a quick fix that renames the declaration everywhere, and `p-lsp lint` for the command line
+- [x] Lint checks: unused declarations, events never sent, unreachable states and code, and shadowed machine variables
 
 ### Grammar ([tree-sitter-p](https://github.com/bencornia/tree-sitter-p))
 

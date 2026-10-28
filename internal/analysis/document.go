@@ -44,6 +44,12 @@ type Document struct {
 	scopesMu sync.Mutex
 	scopes   map[scopeKey][]declaration
 
+	// uses caches how many identifiers spell each name; see nameUses.
+	uses struct {
+		once   sync.Once
+		counts map[string]uses
+	}
+
 	// parents caches each node's parent; see parent.
 	parentsMu sync.Mutex
 	parents   map[uintptr]*sitter.Node

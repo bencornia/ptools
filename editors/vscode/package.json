@@ -2,7 +2,7 @@
   "name": "p-lsp",
   "displayName": "P",
   "description": "P language support: the p-lsp language server, pfmt formatting, and the prdb replay debugger",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "bencornia",
   "repository": {
     "type": "git",
@@ -73,7 +73,7 @@
     "commands": [
       {
         "command": "p-lsp.lintWorkspace",
-        "title": "Check Naming in Workspace",
+        "title": "Lint Workspace",
         "category": "P"
       },
       {

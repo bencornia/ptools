@@ -1,11 +1,14 @@
 package server
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/bencornia/p-lsp/internal/style"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -81,5 +84,39 @@ func TestNamingWarningsAndRenameFix(t *testing.T) {
 	write(t, root, ".plint.toml", "[naming]\nevents = \"wrong\"\n")
 	if got := namingWarnings(s, events); len(got) != 2 || !strings.Contains(s.styleErrors[filepath.Join(root, ".plint.toml")], "wrong") {
 		t.Errorf("with a bad .plint.toml, warnings = %q and errors %v; want the default's", got, s.styleErrors)
+	}
+}
+
+func TestCheckWarnings(t *testing.T) {
+	s, root := start(t, map[string]string{
+		"App/App.pproj":     appProject,
+		"App/PSrc/Events.p": "event Ping;\nevent Pong;\n",
+		"App/PSrc/Main.p":   "machine Client {\n  start state Init {\n    entry { send this, Pong; }\n    on Ping, Pong do {}\n  }\n}\n",
+	}, client{})
+	events := filepath.Join(root, "App/PSrc/Events.p")
+	open(t, s, root, "App/PSrc/Events.p")
+
+	checks := func() []string {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		var got []string
+		for _, d := range s.diagnosticsFor(events) {
+			if d.Code != nil && d.Code.Value != "naming" {
+				got = append(got, fmt.Sprintf("%v: %s", d.Code.Value, d.Message))
+			}
+		}
+		return got
+	}
+	// Pong is sent from Main.p.
+	want := []string{"never-sent: event `Ping` is never sent, raised or announced"}
+	if got := checks(); !slices.Equal(got, want) {
+		t.Errorf("checks = %q, want %q", got, want)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "App", style.FileName), []byte("[checks]\nnever_sent = \"off\"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := checks(); len(got) > 0 {
+		t.Errorf("turned off, checks = %q", got)
 	}
 }

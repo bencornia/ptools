@@ -1,6 +1,8 @@
 // Command p-lsp is a language server for the P programming language.
 //
-// Run as p-lsp lint [path ...], it checks the naming of P files instead.
+// Run as p-lsp lint [-json] [path ...], it checks P files for lint problems
+// instead: naming, unused declarations, and the other checks .plint.toml
+// configures.
 package main
 
 import (

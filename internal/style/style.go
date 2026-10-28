@@ -1,5 +1,6 @@
 // Package style holds the naming conventions p-lsp checks P names against,
-// and reads them from a project's .plint.toml.
+// and which of its other checks are on, and reads them from a project's
+// .plint.toml.
 package style
 
 import (
@@ -52,17 +53,49 @@ type Naming struct {
 	Prefixes      []string `toml:"prefixes"`
 }
 
+// Level is how a check reports what it finds.
+type Level string
+
+const (
+	LevelWarning Level = "warning"
+	LevelError   Level = "error"
+	LevelOff     Level = "off"
+)
+
+// Checks is the level of each check besides naming.
+type Checks struct {
+	// Unused declarations: types, events, functions and variables.
+	Unused Level `toml:"unused"`
+	// NeverSent events, which are handled or observed but never sent,
+	// raised or announced.
+	NeverSent Level `toml:"never_sent"`
+	// UnreachableStates, which nothing goes to from the start state.
+	UnreachableStates Level `toml:"unreachable_states"`
+	// UnreachableCode, after a return, raise, goto, break or continue.
+	UnreachableCode Level `toml:"unreachable_code"`
+	// Shadowing of a machine variable by a parameter or local variable.
+	Shadowing Level `toml:"shadowing"`
+}
+
 // Config is a .plint.toml file.
 type Config struct {
 	Naming Naming `toml:"naming"`
+	Checks Checks `toml:"checks"`
 }
 
 // Default is the configuration with no .plint.toml: types, and the
 // declarations that are like types, in TitleCase, enum constants in
 // SCREAMING_CASE, and everything else in snake_case. The prefixes are the
-// ones P's own examples use, for types, events and test cases.
+// ones P's own examples use, for types, events and test cases. Every other
+// check warns.
 func Default() Config {
-	return Config{Naming: Naming{
+	return Config{Checks: Checks{
+		Unused:            LevelWarning,
+		NeverSent:         LevelWarning,
+		UnreachableStates: LevelWarning,
+		UnreachableCode:   LevelWarning,
+		Shadowing:         LevelWarning,
+	}, Naming: Naming{
 		Types:         TitleCase,
 		EnumConstants: ScreamingCase,
 		Events:        TitleCase,
@@ -91,6 +124,12 @@ func Load(path string) (Config, error) {
 	for _, kind := range []Case{n.Types, n.EnumConstants, n.Events, n.Machines, n.States, n.Modules, n.Functions, n.Variables, n.TestCases} {
 		if _, ok := patterns[kind]; !ok && kind != Off {
 			return Default(), fmt.Errorf("%s: unknown case %q; use TitleCase, camelCase, snake_case, SCREAMING_CASE or off", path, kind)
+		}
+	}
+	k := c.Checks
+	for _, level := range []Level{k.Unused, k.NeverSent, k.UnreachableStates, k.UnreachableCode, k.Shadowing} {
+		if level != LevelWarning && level != LevelError && level != LevelOff {
+			return Default(), fmt.Errorf("%s: unknown level %q; use warning, error or off", path, level)
 		}
 	}
 	return c, nil
