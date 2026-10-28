@@ -158,3 +158,38 @@ func TestAvailable(t *testing.T) {
 		t.Errorf("sh reported as unavailable: %v", err)
 	}
 }
+
+// An editor started from a desktop may not have the PATH and DOTNET_ROOT a
+// shell profile sets; p is found where `dotnet tool install --global` puts
+// it, and run with that .NET.
+func TestAvailableInDotnetTools(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", "/usr/bin:/bin")
+	t.Setenv("DOTNET_ROOT", "")
+	r := &Runner{Command: []string{"p"}, Timeout: 10 * time.Second}
+	if err := r.Available(); err == nil {
+		t.Fatal("p reported as available with no p anywhere")
+	}
+
+	dotnet := filepath.Join(home, ".dotnet")
+	os.MkdirAll(filepath.Join(dotnet, "tools"), 0o755)
+	os.WriteFile(filepath.Join(dotnet, "dotnet"), nil, 0o755)
+	seen := filepath.Join(home, "seen")
+	script := "#!/bin/sh\necho \"$DOTNET_ROOT $PATH\" > " + seen + "\n"
+	if err := os.WriteFile(filepath.Join(dotnet, "tools", "p"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.Available(); err != nil {
+		t.Fatalf("p in ~/.dotnet/tools reported as unavailable: %v", err)
+	}
+	pproj := filepath.Join(home, "App", "App.pproj")
+	os.MkdirAll(filepath.Dir(pproj), 0o755)
+	if _, err := r.Check(pproj, nil); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := os.ReadFile(seen)
+	if want := dotnet + " " + dotnet + ":/usr/bin:/bin\n"; string(got) != want {
+		t.Errorf("p ran with DOTNET_ROOT and PATH %q, not %q", got, want)
+	}
+}

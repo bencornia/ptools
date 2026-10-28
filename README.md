@@ -50,8 +50,12 @@ off, and the log says so. To use a different command, pass
 `-compiler "<command>"`, or `-compiler ""` to turn it off. Generated code goes
 to a temporary directory, not your project.
 
-`p` is a .NET tool, so if you installed .NET in your home directory, the
-environment your editor starts the server in needs it too:
+`p` is a .NET tool. An editor started from a desktop menu often doesn't
+have the `PATH` your shell profile sets, so if `p` isn't on the `PATH`,
+p-lsp looks where `dotnet tool install --global P` puts it,
+`~/.dotnet/tools/p`, and runs it with `DOTNET_ROOT` set to `~/.dotnet` if
+.NET is there. If yours is somewhere else, the environment your editor
+starts the server in needs it:
 
 ```sh
 export DOTNET_ROOT="$HOME/.dotnet"

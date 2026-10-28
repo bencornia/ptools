@@ -36,15 +36,40 @@ type Runner struct {
 	mu sync.Mutex
 	// running cancels the check in progress for each project.
 	running map[string]context.CancelFunc
+	// env is the environment to run the compiler in, or nil for p-lsp's.
+	env []string
 }
 
-// Available reports whether the compiler command can be found.
+// Available reports whether the compiler command can be found. Editors
+// started from a desktop often lack the PATH and DOTNET_ROOT a shell
+// profile sets, so when the command is the default "p" and isn't on the
+// PATH, it looks where `dotnet tool install --global` puts it, and from
+// then on runs it with the .NET it was installed with.
 func (r *Runner) Available() error {
 	if len(r.Command) == 0 {
 		return errors.New("no compiler command configured")
 	}
 	_, err := exec.LookPath(r.Command[0])
-	return err
+	if err == nil || r.Command[0] != "p" {
+		return err
+	}
+	home, homeErr := os.UserHomeDir()
+	if homeErr != nil {
+		return err
+	}
+	tool := filepath.Join(home, ".dotnet", "tools", "p")
+	if _, statErr := os.Stat(tool); statErr != nil {
+		return err
+	}
+	r.Command = append([]string{tool}, r.Command[1:]...)
+	root := os.Getenv("DOTNET_ROOT")
+	if root == "" {
+		root = filepath.Join(home, ".dotnet")
+	}
+	if _, statErr := os.Stat(filepath.Join(root, "dotnet")); statErr == nil {
+		r.env = append(os.Environ(), "DOTNET_ROOT="+root, "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
+	}
+	return nil
 }
 
 // Check type-checks the project at pproj, whose files are files, and returns
@@ -85,6 +110,7 @@ func (r *Runner) Check(pproj string, files []string) ([]Error, error) {
 	defer stop()
 	cmd := exec.CommandContext(run, r.Command[0], args...)
 	cmd.Dir = filepath.Dir(pproj)
+	cmd.Env = r.env
 	stopTree(cmd)
 	// Don't wait long on children still holding the output pipe open once
 	// the compiler itself has exited or been stopped.
