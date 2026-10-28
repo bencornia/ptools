@@ -232,7 +232,7 @@ VS Code needs an extension to start a language server; a minimal one is in
 cd editors/vscode
 npm install
 npx @vscode/vsce package --skip-license
-code --install-extension p-lsp-0.5.0.vsix
+code --install-extension p-lsp-0.5.1.vsix
 ```
 
 It highlights with the server's semantic tokens. Set `p-lsp.path` if

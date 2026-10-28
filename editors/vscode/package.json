@@ -2,7 +2,7 @@
   "name": "p-lsp",
   "displayName": "P",
   "description": "P language support: the p-lsp language server, pfmt formatting, and the prdb replay debugger",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "publisher": "bencornia",
   "repository": {
     "type": "git",

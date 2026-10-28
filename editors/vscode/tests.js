@@ -25,7 +25,7 @@ async function runTest(test, projectOf) {
         return;
     }
     const config = vscode.workspace.getConfiguration('p');
-    const schedules = config.get('schedules');
+    const schedules = schedulesSetting(config);
     const run = new TestRun(test.name, project, pCommand(config.get('command')), schedules);
     const task = new vscode.Task(
         { type: 'p', test: test.name },
@@ -66,8 +66,8 @@ async function debugTest(test, projectOf) {
         name: `Find a bug in ${test.name}`,
         testcase: test.name,
         project,
-        schedules: config.get('schedules'),
-        compiler: config.get('command'),
+        schedules: schedulesSetting(config),
+        compiler: config.get('command')?.length ? config.get('command') : ['p'],
     });
 }
 
@@ -169,6 +169,14 @@ function isCase(test, name) {
     return test === name || test.startsWith(name + '___');
 }
 
+// schedulesSetting returns p.schedules, or its default, 1000, if it's unset
+// or not a positive whole number. VS Code can run an extension's commands
+// before it knows the defaults of the settings it contributes.
+function schedulesSetting(config) {
+    const schedules = config.get('schedules');
+    return Number.isInteger(schedules) && schedules > 0 ? schedules : 1000;
+}
+
 // pCommand finds the command that runs the P tool, and the environment to
 // run it in. Editors started from a desktop often lack the PATH and
 // DOTNET_ROOT a shell profile sets, so when it's the default p and isn't
@@ -197,4 +205,4 @@ function onPath(name) {
     return (process.env.PATH ?? '').split(path.delimiter).some((dir) => dir && fs.existsSync(path.join(dir, name)));
 }
 
-module.exports = { registerTests, findBug, pCommand, TestRun };
+module.exports = { registerTests, findBug, pCommand, schedulesSetting, TestRun };
