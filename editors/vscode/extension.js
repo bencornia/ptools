@@ -172,24 +172,76 @@ async function traceItems() {
 async function testCaseItems() {
     return (await testCases()).map((test) => ({
         label: test.name,
-        description: vscode.workspace.asRelativePath(test.uri),
+        description: [test.detail, vscode.workspace.asRelativePath(test.uri)].filter(Boolean).join(' · '),
         test,
     }));
 }
 
 // testCases finds the test cases declared in the workspace's P files, by
 // name, with the project each is in: the nearest directory, from its
-// file's up, with a .pproj file.
+// file's up, with a .pproj file. A parameterised test is listed by its own
+// name, which checks every case, and, if no assume or twise drops some,
+// by each case's.
 async function testCases() {
     const uris = await vscode.workspace.findFiles('**/*.p', '**/node_modules/**');
     const tests = [];
     for (const uri of uris) {
         const text = new TextDecoder().decode(await vscode.workspace.fs.readFile(uri));
-        for (const match of text.matchAll(/^\s*test\s+(\w+)/gm)) {
-            tests.push({ name: match[1], uri, project: await projectOf(uri) });
+        const project = await projectOf(uri);
+        for (const decl of testDeclarations(text)) {
+            if (!decl.params) {
+                tests.push({ name: decl.name, uri, project });
+                continue;
+            }
+            tests.push({ name: decl.name, uri, project, detail: 'every case' });
+            if (!decl.filtered) {
+                for (const values of combinations(decl.params)) {
+                    tests.push({
+                        name: decl.name + '___' + values.map(([p, v]) => `${p}_${v}`).join('__'),
+                        uri,
+                        project,
+                        detail: values.map(([p, v]) => `${p} = ${v}`).join(', '),
+                    });
+                }
+            }
         }
     }
     return tests.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// testDeclarations reads the test declarations in P source, outside
+// comments: test [param (p in [v, ...], ...)] [assume (...)] [twise] name [...
+function testDeclarations(text) {
+    text = text.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, (c) => c.replace(/[^\n]/g, ' '));
+    const decls = [];
+    for (const match of text.matchAll(/^\s*test\b/gm)) {
+        const end = text.indexOf('[main', match.index);
+        const header = text.slice(match.index + match[0].length, end < 0 ? undefined : end);
+        const name = header.match(/(\w+)\s*$/)?.[1];
+        if (!name || end < 0) continue;
+        const decl = { name, filtered: /\bassume\b|\bwise\b|\bpairwise\b/.test(header) };
+        const param = header.match(/^\s*param\s*\(/);
+        if (param) {
+            decl.params = [];
+            for (const p of header.matchAll(/(\w+)\s+in\s+\[([^\]]*)\]/g)) {
+                decl.params.push([p[1], p[2].split(',').map((v) => v.trim()).filter(Boolean)]);
+            }
+        }
+        decls.push(decl);
+    }
+    return decls;
+}
+
+// combinations lists each choice of a value for every parameter, the
+// first parameter's changing fastest, as P orders a test's cases.
+function combinations(params) {
+    let out = [[]];
+    for (const [name, values] of params) {
+        const next = [];
+        for (const v of values) for (const prefix of out) next.push([...prefix, [name, v]]);
+        out = next;
+    }
+    return out;
 }
 
 async function projectOf(uri) {
