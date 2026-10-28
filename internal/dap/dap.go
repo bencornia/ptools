@@ -35,7 +35,14 @@ type LaunchArguments struct {
 	// StopOnEntry stops at the first step. It's true unless set false;
 	// otherwise the session runs to the first breakpoint.
 	StopOnEntry *bool `json:"stopOnEntry"`
-	// Compiler runs the P tool, to replay a schedule; "p" by default.
+	// TestCase, in place of Trace, is a test case to check until PChecker
+	// finds a bug, and then debug the bug's trace.
+	TestCase string `json:"testcase"`
+	// Schedules is how many schedules to explore for a bug in TestCase:
+	// 1000 by default.
+	Schedules int `json:"schedules"`
+	// Compiler runs the P tool, to replay a schedule or check a test case;
+	// "p" by default.
 	Compiler []string `json:"compiler"`
 }
 
@@ -235,12 +242,13 @@ func (s *server) launch(req *godap.LaunchRequest) {
 		s.fail(req, "bad launch arguments: "+err.Error())
 		return
 	}
-	if args.Trace == "" {
-		s.fail(req, "launch needs a trace: the .trace.json file PChecker wrote")
+	if args.Trace == "" && args.TestCase == "" {
+		s.fail(req, "launch needs a trace, the .trace.json file PChecker wrote, or a test case to check")
 		return
 	}
 	sess, closeSession, err := session.Open(args.Trace, session.Options{
 		Project: args.Project, Compiler: args.Compiler, Progress: consoleWriter{s},
+		TestCase: args.TestCase, Schedules: args.Schedules,
 	})
 	if err != nil {
 		s.fail(req, err.Error())
@@ -257,7 +265,11 @@ func (s *server) launch(req *godap.LaunchRequest) {
 	}
 	s.send(&godap.LaunchResponse{Response: response(req)})
 	s.send(&godap.InitializedEvent{Event: event("initialized")})
-	s.output("console", fmt.Sprintf("Replaying %d steps from %s\n", len(sess.Steps), args.Trace))
+	from := args.Trace
+	if args.TestCase != "" {
+		from = "the bug in " + args.TestCase
+	}
+	s.output("console", fmt.Sprintf("Replaying %d steps from %s\n", len(sess.Steps), from))
 }
 
 func (s *server) setBreakpoints(req *godap.SetBreakpointsRequest) {

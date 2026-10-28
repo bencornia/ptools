@@ -309,3 +309,36 @@ func TestLaunchSchedule(t *testing.T) {
 	}
 	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
 }
+
+func TestLaunchTestCase(t *testing.T) {
+	if _, err := exec.LookPath("p"); err != nil {
+		t.Skip("the P compiler isn't installed")
+	}
+	project := t.TempDir()
+	if err := os.CopyFS(project, os.DirFS("../../testdata/pingpong")); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(project)
+	c := connect(t)
+	c.request(&godap.InitializeRequest{Request: godap.Request{Command: "initialize"}})
+	args, _ := json.Marshal(LaunchArguments{TestCase: "tcPingPong", Schedules: 100})
+	c.request(&godap.LaunchRequest{Request: godap.Request{Command: "launch"}, Arguments: args})
+	c.request(&godap.ConfigurationDoneRequest{Request: godap.Request{Command: "configurationDone"}})
+	c.stopped()
+	c.stopped() // the first stop is sent twice, for Helix
+	c.request(&godap.ContinueRequest{Request: godap.Request{Command: "continue"}})
+	if s := c.stopped(); s.Reason != "exception" || !strings.Contains(s.Text, "expected 3 pongs, got 4") {
+		t.Errorf("stopped %+v", s)
+	}
+	out := c.output("console")
+	for _, want := range []string{
+		"Checking tcPingPong, for up to 100 schedules\n",
+		"saved its trace and schedule in PCheckerOutput/prdb/tcPingPong.*\n",
+		"steps from the bug in tcPingPong\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("console %q lacks %q", out, want)
+		}
+	}
+	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
+}

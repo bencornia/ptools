@@ -23,10 +23,12 @@ const version = "0.1.0"
 func main() {
 	list := flag.Bool("list", false, "print each step of the trace or schedule given as an argument, with its source location")
 	project := flag.String("project", "", "the P project's directory (default: found from the trace's location)")
+	testCase := flag.String("testcase", "", "with -list, check this test case until PChecker finds a bug, and list the bug's trace")
+	schedules := flag.Int("schedules", 1000, "how many schedules -testcase explores for a bug")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	verbose := flag.Bool("v", false, "log the protocol messages to stderr")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: prdb [flags]               (debug adapter, over stdio)\n       prdb -list [flags] trace.json|file.schedule\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: prdb [flags]               (debug adapter, over stdio)\n       prdb -list [flags] trace.json|file.schedule\n       prdb -list -testcase name [flags]\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -35,11 +37,12 @@ func main() {
 	case *showVersion:
 		fmt.Println(version)
 	case *list:
-		if flag.NArg() != 1 {
+		if (flag.NArg() == 1) == (*testCase != "") {
 			flag.Usage()
 			os.Exit(2)
 		}
-		if err := printSteps(flag.Arg(0), *project); err != nil {
+		opts := session.Options{Project: *project, Progress: os.Stderr, TestCase: *testCase, Schedules: *schedules}
+		if err := printSteps(flag.Arg(0), opts); err != nil {
 			fmt.Fprintln(os.Stderr, "prdb:", err)
 			os.Exit(1)
 		}
@@ -55,8 +58,8 @@ func main() {
 	}
 }
 
-func printSteps(tracePath, project string) error {
-	s, closeSession, err := session.Open(tracePath, session.Options{Project: project, Progress: os.Stderr})
+func printSteps(tracePath string, opts session.Options) error {
+	s, closeSession, err := session.Open(tracePath, opts)
 	if err != nil {
 		return err
 	}

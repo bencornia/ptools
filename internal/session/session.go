@@ -439,19 +439,46 @@ type Options struct {
 	Project string
 	// Compiler runs the P tool, to replay a schedule; "p" by default.
 	Compiler []string
-	// Progress, if not nil, hears what replaying a schedule is doing.
+	// Progress, if not nil, hears what replaying a schedule or checking a
+	// test case is doing.
 	Progress io.Writer
+	// TestCase, if set, is a test case to check until PChecker finds a
+	// bug, whose trace Open loads in place of path's. The project is then
+	// found from the current directory, unless Project is set.
+	TestCase string
+	// Schedules is how many schedules to explore for a bug in TestCase:
+	// 1000 by default.
+	Schedules int
 }
 
-// Open loads a trace, or a .schedule file replayed into one, and the
-// source of the project it's from. close frees the parsed source.
+// Open loads a trace, or a .schedule file replayed into one, or the bug
+// PChecker finds in opts.TestCase, and the source of the project it's
+// from. close frees the parsed source.
 func Open(path string, opts Options) (s *Session, close func(), err error) {
 	project := opts.Project
 	if project == "" {
-		project = FindProject(filepath.Dir(path))
+		from := filepath.Dir(path)
+		if opts.TestCase != "" {
+			from = "."
+		}
+		project = FindProject(from)
+	}
+	if project, err = filepath.Abs(project); err != nil {
+		return nil, nil, err
 	}
 	tracePath := path
-	if strings.HasSuffix(path, ".schedule") {
+	switch {
+	case opts.TestCase != "":
+		schedules := opts.Schedules
+		if schedules <= 0 {
+			schedules = 1000
+		}
+		tracePath, err = replay.TestCase(opts.TestCase, project, schedules, opts.Compiler, opts.Progress)
+		if err != nil {
+			return nil, nil, err
+		}
+		path = tracePath
+	case strings.HasSuffix(path, ".schedule"):
 		replayed, clean, err := replay.Schedule(path, project, opts.Compiler, opts.Progress)
 		if err != nil {
 			return nil, nil, err

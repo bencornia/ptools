@@ -1,8 +1,11 @@
-// Package replay turns a PChecker schedule into a trace, by compiling the
-// project and replaying the schedule with p check.
+// Package replay makes traces with PChecker: by replaying a schedule, or
+// by checking a test case until it finds a bug. Either way it compiles the
+// project first, so the trace matches the source as it is.
 package replay
 
 import (
+	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -18,71 +22,30 @@ import (
 // trace. It returns the trace's path, in a temporary directory that clean
 // removes. compiler runs the P tool, as in []string{"p"}; progress, if not
 // nil, gets a line as each stage starts.
-//
-// The build goes to the temporary directory too, though the compiler
-// still makes the project's output directory; Schedule removes it again
-// if it made it and it's empty.
 func Schedule(schedule, project string, compiler []string, progress io.Writer) (tracePath string, clean func(), err error) {
-	if len(compiler) == 0 {
-		compiler = []string{"p"}
-	}
-	command, env, err := findCompiler(compiler[0])
-	if err != nil {
-		return "", nil, err
-	}
 	schedule, err = filepath.Abs(schedule)
 	if err != nil {
 		return "", nil, err
 	}
-	pprojs, _ := filepath.Glob(filepath.Join(project, "*.pproj"))
-	if len(pprojs) == 0 {
-		return "", nil, fmt.Errorf("no .pproj file in %s to compile", project)
-	}
-	dir, err := os.MkdirTemp("", "prdb-replay-")
+	c, err := newChecker(project, compiler, progress)
 	if err != nil {
 		return "", nil, err
 	}
-	clean = func() { os.RemoveAll(dir) }
 	defer func() {
 		if err != nil {
-			clean()
+			c.clean()
 		}
 	}()
-
-	say := func(format string, args ...any) {
-		if progress != nil {
-			fmt.Fprintf(progress, format+"\n", args...)
-		}
-	}
-	run := func(args ...string) error {
-		cmd := exec.Command(command, append(slices.Clone(compiler[1:]), args...)...)
-		cmd.Dir = project
-		cmd.Env = env
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("%s %s: %w\n%s", filepath.Base(compiler[0]), args[0], err, strings.TrimSpace(string(out)))
-		}
-		return nil
-	}
-
-	before := entries(project)
-	say("Compiling %s", filepath.Base(pprojs[0]))
-	build := filepath.Join(dir, "build")
-	err = run("compile", "--pproj", pprojs[0], "--outdir", build)
-	removeNewEmpty(project, before)
-	if err != nil {
-		return "", nil, err
-	}
-	dll, err := checkerDLL(build, strings.TrimSuffix(filepath.Base(pprojs[0]), ".pproj"))
+	dll, err := c.compile()
 	if err != nil {
 		return "", nil, err
 	}
 
-	say("Replaying %s", filepath.Base(schedule))
-	check := filepath.Join(dir, "check")
+	c.say("Replaying %s", filepath.Base(schedule))
+	check := filepath.Join(c.dir, "check")
 	// p check exits non-zero when the replay finds the bug, which is the
 	// usual case; whether it wrote a trace is what matters.
-	runErr := run("check", dll, "--replay", schedule, "--verbose", "--outdir", check)
+	_, runErr := c.run("check", dll, "--replay", schedule, "--verbose", "--outdir", check)
 	traces, _ := filepath.Glob(filepath.Join(check, "*", "*.trace.json"))
 	if len(traces) == 0 {
 		if runErr == nil {
@@ -90,7 +53,166 @@ func Schedule(schedule, project string, compiler []string, progress io.Writer) (
 		}
 		return "", nil, fmt.Errorf("replaying %s: %w", filepath.Base(schedule), runErr)
 	}
-	return traces[0], clean, nil
+	return traces[0], c.clean, nil
+}
+
+// TestCase compiles the P project in project and checks the test case
+// named name, exploring up to schedules schedules, until PChecker finds a
+// bug. It returns the bug's trace, which it also saves, with its schedule,
+// as PCheckerOutput/prdb/<name>.trace.json and .schedule in the project,
+// for replaying later. If no schedule finds a bug, it returns an error.
+func TestCase(name, project string, schedules int, compiler []string, progress io.Writer) (tracePath string, err error) {
+	c, err := newChecker(project, compiler, progress)
+	if err != nil {
+		return "", err
+	}
+	defer c.clean()
+	dll, err := c.compile()
+	if err != nil {
+		return "", err
+	}
+
+	c.say("Checking %s, for up to %d schedules", name, schedules)
+	out, runErr := c.run("check", dll, "--testcase", name, "--schedules", strconv.Itoa(schedules), "--outdir", filepath.Join(c.dir, "check"))
+	ran, found := testOutput(out, name)
+	switch {
+	case !ran:
+		tests, _ := c.run("check", dll, "--list-tests")
+		return "", fmt.Errorf("the project has no test case %s; its tests are: %s", name, strings.Join(listedTests(tests), ", "))
+	case found == "":
+		if runErr != nil {
+			return "", fmt.Errorf("checking %s: %w", name, runErr)
+		}
+		return "", fmt.Errorf("PChecker found no bug in %s in %d schedules", name, schedules)
+	}
+
+	saved := filepath.Join(project, "PCheckerOutput", "prdb")
+	if err := os.MkdirAll(saved, 0o755); err != nil {
+		return "", err
+	}
+	tracePath = filepath.Join(saved, name+".trace.json")
+	if err := copyFile(found, tracePath); err != nil {
+		return "", err
+	}
+	schedule := strings.TrimSuffix(found, ".trace.json") + ".schedule"
+	if err := copyFile(schedule, filepath.Join(saved, name+".schedule")); err != nil {
+		return "", err
+	}
+	rel, _ := filepath.Rel(project, saved)
+	c.say("Found a bug; saved its trace and schedule in %s", filepath.Join(rel, name)+".*")
+	return tracePath, nil
+}
+
+// testOutput reads p check's output for whether it ran the test case
+// name, and the trace it wrote for it if it found a bug. -tc runs every
+// test case whose name starts with the one given, each under a
+// ".. Test case :: <name>" heading.
+func testOutput(out []byte, name string) (ran bool, trace string) {
+	current := ""
+	scanner := bufio.NewScanner(bytes.NewReader(out))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if test, ok := strings.CutPrefix(line, ".. Test case :: "); ok {
+			current = strings.TrimSpace(test)
+			ran = ran || current == name
+			continue
+		}
+		if path, ok := strings.CutPrefix(line, "..... Writing "); ok && current == name && trace == "" && strings.HasSuffix(path, ".trace.json") {
+			trace = path
+		}
+	}
+	return ran, trace
+}
+
+// listedTests reads the test cases from p check --list-tests.
+func listedTests(out []byte) []string {
+	var tests []string
+	listing := false
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, ".. List of test cases"):
+			listing = true
+		case listing && (line == "" || strings.HasPrefix(line, ".")):
+			listing = false
+		case listing:
+			tests = append(tests, line)
+		}
+	}
+	return tests
+}
+
+func copyFile(from, to string) error {
+	data, err := os.ReadFile(from)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(to, data, 0o644)
+}
+
+// checker runs the P tool on a project, with its output in a temporary
+// directory.
+type checker struct {
+	project, pproj string
+	command        string
+	args, env      []string
+	dir            string
+	progress       io.Writer
+}
+
+func newChecker(project string, compiler []string, progress io.Writer) (*checker, error) {
+	if len(compiler) == 0 {
+		compiler = []string{"p"}
+	}
+	command, env, err := findCompiler(compiler[0])
+	if err != nil {
+		return nil, err
+	}
+	pprojs, _ := filepath.Glob(filepath.Join(project, "*.pproj"))
+	if len(pprojs) == 0 {
+		return nil, fmt.Errorf("no .pproj file in %s to compile", project)
+	}
+	dir, err := os.MkdirTemp("", "prdb-replay-")
+	if err != nil {
+		return nil, err
+	}
+	return &checker{project: project, pproj: pprojs[0], command: command, args: compiler[1:], env: env, dir: dir, progress: progress}, nil
+}
+
+func (c *checker) clean() { os.RemoveAll(c.dir) }
+
+func (c *checker) say(format string, args ...any) {
+	if c.progress != nil {
+		fmt.Fprintf(c.progress, format+"\n", args...)
+	}
+}
+
+// run runs the P tool with args in the project, and returns its output.
+func (c *checker) run(args ...string) ([]byte, error) {
+	cmd := exec.Command(c.command, append(slices.Clone(c.args), args...)...)
+	cmd.Dir = c.project
+	cmd.Env = c.env
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return out, fmt.Errorf("p %s: %w\n%s", args[0], err, strings.TrimSpace(string(out)))
+	}
+	return out, nil
+}
+
+// compile builds the project for PChecker, and returns the assembly to
+// check. The build goes to the temporary directory, though the compiler
+// still makes the project's output directory; compile removes it again
+// if it made it and it's empty.
+func (c *checker) compile() (string, error) {
+	before := entries(c.project)
+	c.say("Compiling %s", filepath.Base(c.pproj))
+	build := filepath.Join(c.dir, "build")
+	_, err := c.run("compile", "--pproj", c.pproj, "--outdir", build)
+	removeNewEmpty(c.project, before)
+	if err != nil {
+		return "", err
+	}
+	return checkerDLL(build, strings.TrimSuffix(filepath.Base(c.pproj), ".pproj"))
 }
 
 // findCompiler finds the P tool, name, and the environment to run it in.

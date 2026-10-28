@@ -32,6 +32,15 @@ where no step happens, at the start of that handler.
 
 ## Getting a trace
 
+prdb can find the bug itself: give it a test case, and it compiles the
+project and runs `p check` on it until PChecker finds a bug, exploring up
+to 1000 schedules unless told otherwise, then debugs the bug's trace. It
+saves the trace and its schedule as
+`PCheckerOutput/prdb/<test case>.trace.json` and `.schedule`, so you can
+replay the same bug again, after a fix too.
+
+Or run PChecker yourself:
+
 ```sh
 p compile
 p check -tc tcMyTest -s 1000
@@ -75,7 +84,9 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 ```
 
 `prdb -list trace.json` prints each step of a trace with its source
-location, without an editor. It takes a `.schedule` file too.
+location, without an editor. It takes a `.schedule` file too, and
+`prdb -list -testcase tcMyTest` lists the bug PChecker finds in a test
+case.
 
 ## VS Code
 
@@ -91,8 +102,10 @@ code --install-extension p-lsp-0.2.0.vsix
 ```
 
 Open a `.p` file and start debugging (F5, or Run and Debug): with no
-`launch.json`, it asks which of the workspace's traces and schedules to
-replay, newest first. To keep a configuration, add one with the "P: Replay a trace" snippet:
+`launch.json`, it asks what to debug: one of the workspace's traces and
+schedules, newest first, or one of its test cases, to check until PChecker
+finds a bug. To keep a configuration, add one with the "P: Replay a
+trace" snippet:
 
 ```json
 {
@@ -103,7 +116,9 @@ replay, newest first. To keep a configuration, add one with the "P: Replay a tra
 }
 ```
 
-Set `trace` to a path, relative to the workspace folder, to skip the picker.
+Set `trace` to a path, relative to the workspace folder, to skip the
+picker. The "P: Find a bug in a test case" snippet adds one that checks
+a test case, with `"testcase": "${command:pickTestCase}"`.
 Breakpoints go in the gutter of `.p` files; the toolbar's Step Back and
 Reverse buttons move backward. Set `prdb.path` if `prdb` isn't on the `PATH`
 VS Code sees, and `prdb.args` to `["-v"]` to log the protocol.
@@ -134,10 +149,12 @@ step forward through a trace.
 
 | Argument | |
 |---|---|
-| `trace` | The `.trace.json` file to replay, or a `.schedule` file to compile and replay. Required. |
-| `project` | The P project's directory, if it can't be found from the trace's. |
+| `trace` | The `.trace.json` file to replay, or a `.schedule` file to compile and replay. |
+| `project` | The P project's directory, if it can't be found from the trace's, or for a test case, from the current directory. |
 | `stopOnEntry` | Stop at the first step; true unless set false, which runs to the first breakpoint. |
-| `compiler` | The command that runs the P tool, to replay a schedule: `["p"]` by default. |
+| `testcase` | In place of `trace`, a test case to check until PChecker finds a bug, whose trace to debug. |
+| `schedules` | How many schedules to explore for a bug in `testcase`: 1000 by default. |
+| `compiler` | The command that runs the P tool, to replay a schedule or check a test case: `["p"]` by default. |
 
 ## Developing
 
@@ -156,7 +173,7 @@ PChecker wrote for it.
 - [x] `prdb -list`
 - [x] VS Code: the debugger in p-lsp's VS Code extension, with a trace picker
 - [x] Launch from a `.schedule` file, replaying it with `p check --replay -v`
-- [ ] Launch a test case: run `p check` to find a bug, then replay it
+- [x] Launch a test case: run `p check` to find a bug, then replay it
 - [ ] Choose which schedule of a `--verbose` trace with several to replay
 - [x] Try the VS Code debugger in VS Code itself
 - [ ] Test the Neovim setup
