@@ -36,6 +36,9 @@ type Step struct {
 	Payload json.RawMessage
 	// Sender and Target are the machines an event was sent from and to.
 	Sender, Target string
+	// Creator is the machine that created Machine, for a
+	// CreateStateMachine; the test's first machine has none.
+	Creator string
 	// Waiting is the events a blocking receive waits for.
 	Waiting []string
 	// Log is PChecker's description of the step, and Error, for an
@@ -75,6 +78,7 @@ type raw struct {
 		Monitor    string          `json:"monitor"`
 		Sender     string          `json:"sender"`
 		Target     string          `json:"target"`
+		Creator    string          `json:"creatorName"`
 		State      string          `json:"state"`
 		StartState string          `json:"startState"`
 		EndState   string          `json:"endState"`
@@ -160,7 +164,7 @@ func steps(entries []raw) []Step {
 			Index: len(steps), Kind: e.Type,
 			State: d.State, EndState: d.EndState, Entry: d.IsEntry,
 			Event: d.Event, Payload: payload,
-			Sender: d.Sender, Target: d.Target, Waiting: d.EventTypes,
+			Sender: d.Sender, Target: d.Target, Creator: d.Creator, Waiting: d.EventTypes,
 			Log: d.Log, Error: d.Error, Clock: d.Clock,
 		}
 		switch {

@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="805.6" height="972" viewBox="0 0 805.6 972" role="img">
+<title>bug.trace.json</title>
+<defs>
+<marker id="head-send" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head send"/></marker>
+<marker id="head-create" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head create"/></marker>
+<marker id="head-observe" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" class="head observe"/></marker>
+</defs>
+<style>
+svg { --bg: #ffffff; --fg: #1f2328; --muted: #6e7781; --line: #d0d7de; --band: #f6f8fa; --accent: #0969da; --mon: #8250df; --fail: #cf222e; --fail-bg: #ffebe9; --pill: #ddf4ff; }
+@media (prefers-color-scheme: dark) {
+  svg { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --line: #30363d; --band: #161b22; --accent: #4493f8; --mon: #ab7df8; --fail: #f85149; --fail-bg: #3c1618; --pill: #12263f; }
+}
+text { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill: var(--fg); }
+.bg { fill: var(--bg); }
+.band { fill: var(--band); }
+.fail-band { fill: var(--fail-bg); }
+.num { fill: var(--muted); text-anchor: end; }
+.life { stroke: var(--line); stroke-width: 2; }
+.life.mon { stroke-dasharray: 4 4; }
+.name rect { fill: var(--bg); stroke: var(--fg); }
+.name.mon rect { stroke: var(--mon); stroke-dasharray: 4 3; }
+.name text { text-anchor: middle; font-weight: 600; }
+.name.mon text { fill: var(--mon); }
+.arrow { stroke: var(--accent); stroke-width: 1.5; fill: none; }
+.arrow.open { stroke-dasharray: 6 4; }
+.arrow.create { stroke: var(--muted); stroke-dasharray: 2 3; }
+.arrow.observe { stroke: var(--mon); stroke-dasharray: 2 3; }
+.head.send { fill: var(--accent); }
+.head.create { fill: var(--muted); }
+.head.observe { fill: var(--mon); }
+.dot { fill: var(--fg); }
+.dot.mon { fill: var(--mon); }
+.pill { fill: var(--pill); stroke: var(--accent); }
+.pill-text { text-anchor: middle; font-size: 11px; }
+.label { paint-order: stroke; stroke: var(--bg); stroke-width: 4px; stroke-linejoin: round; }
+.label.muted { fill: var(--muted); }
+.label.mon { fill: var(--mon); }
+.label.accent { fill: var(--accent); }
+.label.print { font-style: italic; }
+.fail { fill: var(--fail); }
+.fail-x, .halt-x { stroke: var(--bg); stroke-width: 2; }
+.fail-text { fill: var(--fail); font-weight: 600; }
+.halt { fill: var(--muted); }
+.hit { fill: transparent; }
+.step:hover .arrow { stroke-width: 3; }
+.step:hover text.label { text-decoration: underline; }
+</style>
+<rect class="bg" width="100%" height="100%"/>
+<text class="num" x="48" y="76">1</text>
+<rect class="band" x="0" y="84" width="805.6" height="24"/>
+<text class="num" x="48" y="100">2</text>
+<text class="num" x="48" y="124">3</text>
+<rect class="band" x="0" y="132" width="805.6" height="24"/>
+<text class="num" x="48" y="148">4</text>
+<text class="num" x="48" y="172">5</text>
+<rect class="band" x="0" y="180" width="805.6" height="24"/>
+<text class="num" x="48" y="196">6</text>
+<text class="num" x="48" y="220">7</text>
+<rect class="band" x="0" y="228" width="805.6" height="24"/>
+<text class="num" x="48" y="244">8</text>
+<text class="num" x="48" y="268">9</text>
+<rect class="band" x="0" y="276" width="805.6" height="24"/>
+<text class="num" x="48" y="292">10</text>
+<text class="num" x="48" y="316">11</text>
+<rect class="band" x="0" y="324" width="805.6" height="24"/>
+<text class="num" x="48" y="340">12</text>
+<text class="num" x="48" y="364">13</text>
+<rect class="band" x="0" y="372" width="805.6" height="24"/>
+<text class="num" x="48" y="388">16</text>
+<text class="num" x="48" y="412">17</text>
+<rect class="band" x="0" y="420" width="805.6" height="24"/>
+<text class="num" x="48" y="436">18</text>
+<text class="num" x="48" y="460">19</text>
+<rect class="band" x="0" y="468" width="805.6" height="24"/>
+<text class="num" x="48" y="484">20</text>
+<text class="num" x="48" y="508">21</text>
+<rect class="band" x="0" y="516" width="805.6" height="24"/>
+<text class="num" x="48" y="532">22</text>
+<text class="num" x="48" y="556">25</text>
+<rect class="band" x="0" y="564" width="805.6" height="24"/>
+<text class="num" x="48" y="580">26</text>
+<text class="num" x="48" y="604">27</text>
+<rect class="band" x="0" y="612" width="805.6" height="24"/>
+<text class="num" x="48" y="628">28</text>
+<text class="num" x="48" y="652">29</text>
+<rect class="band" x="0" y="660" width="805.6" height="24"/>
+<text class="num" x="48" y="676">30</text>
+<text class="num" x="48" y="700">31</text>
+<rect class="band" x="0" y="708" width="805.6" height="24"/>
+<text class="num" x="48" y="724">34</text>
+<text class="num" x="48" y="748">35</text>
+<rect class="band" x="0" y="756" width="805.6" height="24"/>
+<text class="num" x="48" y="772">36</text>
+<text class="num" x="48" y="796">37</text>
+<rect class="band" x="0" y="804" width="805.6" height="24"/>
+<text class="num" x="48" y="820">38</text>
+<text class="num" x="48" y="844">39</text>
+<rect class="band" x="0" y="852" width="805.6" height="24"/>
+<text class="num" x="48" y="868">40</text>
+<rect class="fail-band" x="0" y="876" width="805.6" height="24"/>
+<text class="num" x="48" y="892">41</text>
+<line class="life" x1="146" y1="120" x2="146" y2="928"/>
+<line class="life" x1="326" y1="168" x2="326" y2="928"/>
+<line class="life" x1="506" y1="216" x2="506" y2="928"/>
+<line class="life mon" x1="686" y1="72" x2="686" y2="928"/>
+<g class="name"><title>Main(1)</title><rect x="112.8" y="10" width="66.4" height="24" rx="4"/><text x="146" y="26">Main(1)</text></g>
+<g class="name"><title>Client(2)</title><rect x="285.6" y="10" width="80.8" height="24" rx="4"/><text x="326" y="26">Client(2)</text></g>
+<g class="name"><title>Server(3)</title><rect x="465.6" y="10" width="80.8" height="24" rx="4"/><text x="506" y="26">Server(3)</text></g>
+<g class="name mon"><title>PongsCounted</title><rect x="634.8" y="10" width="102.4" height="24" rx="4"/><text x="686" y="26">PongsCounted</text></g>
+<g class="name"><title>Main(1)</title><rect x="112.8" y="938" width="66.4" height="24" rx="4"/><text x="146" y="954">Main(1)</text></g>
+<g class="name"><title>Client(2)</title><rect x="285.6" y="938" width="80.8" height="24" rx="4"/><text x="326" y="954">Client(2)</text></g>
+<g class="name"><title>Server(3)</title><rect x="465.6" y="938" width="80.8" height="24" rx="4"/><text x="506" y="954">Server(3)</text></g>
+<g class="name mon"><title>PongsCounted</title><rect x="634.8" y="938" width="102.4" height="24" rx="4"/><text x="686" y="954">PongsCounted</text></g>
+<g class="step"><title>1: PongsCounted was created.</title><circle class="dot " cx="686" cy="72" r="3"/></g>
+<g class="step"><title>2: PongsCounted enters state 'Watching'.</title><rect class="pill" x="651.2" y="87" width="69.6" height="18" rx="9"/><text class="pill-text" x="686" y="100">Watching</text></g>
+<g class="step"><title>3: Main(1) was created by task '2'.</title><circle class="dot " cx="146" cy="120" r="3"/></g>
+<g class="step"><title>4: Main(1) enters state 'Init'.</title><rect class="pill" x="125.6" y="135" width="40.8" height="18" rx="9"/><text class="pill-text" x="146" y="148">Init</text></g>
+<g class="step"><title>5: Client(2) was created by Main(1).</title><line class="arrow create" x1="146" y1="168" x2="322" y2="168" marker-end="url(#head-create)"/><text class="label muted" x="154" y="163" text-anchor="start">new</text><circle class="dot " cx="326" cy="168" r="3"/></g>
+<g class="step"><title>6: Client(2) enters state 'Init'.</title><rect class="pill" x="305.6" y="183" width="40.8" height="18" rx="9"/><text class="pill-text" x="326" y="196">Init</text></g>
+<g class="step"><title>7: Server(3) was created by Client(2).</title><line class="arrow create" x1="326" y1="216" x2="502" y2="216" marker-end="url(#head-create)"/><text class="label muted" x="334" y="211" text-anchor="start">new</text><circle class="dot " cx="506" cy="216" r="3"/></g>
+<g class="step"><title>8: Server(3) enters state 'Serving'.</title><rect class="pill" x="474.8" y="231" width="62.4" height="18" rx="9"/><text class="pill-text" x="506" y="244">Serving</text></g>
+<g class="step"><title>9: 'Client(2)' in state 'Init' sent event 'eHello with payload (Client(2))' to 'Server(3)'.</title><line class="arrow send" x1="326" y1="264" x2="502" y2="312" marker-end="url(#head-send)"/><text class="label " x="334" y="259" text-anchor="start">eHello (Client(2))</text><circle class="dot " cx="326" cy="264" r="3"/></g>
+<g class="step"><title>10: Client(2) is waiting to dequeue an event of type 'eHelloBack' or 'PHalt' in state 'Init'.</title><circle class="dot " cx="326" cy="288" r="3"/><text class="label muted" x="336" y="292">receive eHelloBack</text></g>
+<g class="step"><title>11: 'Server(3)' dequeued event 'eHello with payload (Client(2))' in state 'Serving'.</title><circle class="hit" cx="506" cy="312" r="8"/></g>
+<g class="step"><title>12: 'Server(3)' in state 'Serving' sent event 'eHelloBack' to 'Client(2)'.</title><line class="arrow send" x1="506" y1="336" x2="330" y2="360" marker-end="url(#head-send)"/><text class="label " x="498" y="331" text-anchor="end">eHelloBack</text><circle class="dot " cx="506" cy="336" r="3"/></g>
+<g class="step"><title>13: 'Client(2)' dequeued event 'eHelloBack' and unblocked in state 'Init'.</title><circle class="hit" cx="326" cy="360" r="8"/></g>
+<g class="step"><title>16: Client(2) enters state 'Pinging'.</title><rect class="pill" x="294.8" y="375" width="62.4" height="18" rx="9"/><text class="pill-text" x="326" y="388">Pinging</text></g>
+<g class="step"><title>17: 'Client(2)' in state 'Pinging' sent event 'ePing with payload (&lt;client:Client(2), n:1, &gt;)' to 'Server(3)'.</title><line class="arrow send" x1="326" y1="408" x2="502" y2="432" marker-end="url(#head-send)"/><text class="label " x="334" y="403" text-anchor="start">ePing (Client(2), 1)</text><circle class="dot " cx="326" cy="408" r="3"/></g>
+<g class="step"><title>18: 'Server(3)' dequeued event 'ePing with payload (&lt;client:Client(2), n:1, &gt;)' in state 'Serving'.</title><circle class="hit" cx="506" cy="432" r="8"/></g>
+<g class="step"><title>19: PongsCounted is processing event 'ePong with payload (1)' in state 'Watching'.</title><line class="arrow observe" x1="506" y1="456" x2="682" y2="456" marker-end="url(#head-observe)"/><text class="label mon" x="514" y="451" text-anchor="start">ePong (1)</text><circle class="dot mon" cx="686" cy="456" r="3"/></g>
+<g class="step"><title>20: 'Server(3)' in state 'Serving' sent event 'ePong with payload (1)' to 'Client(2)'.</title><line class="arrow send" x1="506" y1="480" x2="330" y2="504" marker-end="url(#head-send)"/><text class="label " x="498" y="475" text-anchor="end">ePong (1)</text><circle class="dot " cx="506" cy="480" r="3"/></g>
+<g class="step"><title>21: 'Client(2)' dequeued event 'ePong with payload (1)' in state 'Pinging'.</title><circle class="hit" cx="326" cy="504" r="8"/></g>
+<g class="step"><title>22: got pong 1</title><circle class="dot " cx="326" cy="528" r="3"/><text class="label print" x="336" y="532">&quot;got pong 1&quot;</text></g>
+<g class="step"><title>25: Client(2) enters state 'Pinging'.</title><rect class="pill" x="294.8" y="543" width="62.4" height="18" rx="9"/><text class="pill-text" x="326" y="556">Pinging</text></g>
+<g class="step"><title>26: 'Client(2)' in state 'Pinging' sent event 'ePing with payload (&lt;client:Client(2), n:2, &gt;)' to 'Server(3)'.</title><line class="arrow send" x1="326" y1="576" x2="502" y2="600" marker-end="url(#head-send)"/><text class="label " x="334" y="571" text-anchor="start">ePing (Client(2), 2)</text><circle class="dot " cx="326" cy="576" r="3"/></g>
+<g class="step"><title>27: 'Server(3)' dequeued event 'ePing with payload (&lt;client:Client(2), n:2, &gt;)' in state 'Serving'.</title><circle class="hit" cx="506" cy="600" r="8"/></g>
+<g class="step"><title>28: PongsCounted is processing event 'ePong with payload (2)' in state 'Watching'.</title><line class="arrow observe" x1="506" y1="624" x2="682" y2="624" marker-end="url(#head-observe)"/><text class="label mon" x="514" y="619" text-anchor="start">ePong (2)</text><circle class="dot mon" cx="686" cy="624" r="3"/></g>
+<g class="step"><title>29: 'Server(3)' in state 'Serving' sent event 'ePong with payload (2)' to 'Client(2)'.</title><line class="arrow send" x1="506" y1="648" x2="330" y2="672" marker-end="url(#head-send)"/><text class="label " x="498" y="643" text-anchor="end">ePong (2)</text><circle class="dot " cx="506" cy="648" r="3"/></g>
+<g class="step"><title>30: 'Client(2)' dequeued event 'ePong with payload (2)' in state 'Pinging'.</title><circle class="hit" cx="326" cy="672" r="8"/></g>
+<g class="step"><title>31: got pong 2</title><circle class="dot " cx="326" cy="696" r="3"/><text class="label print" x="336" y="700">&quot;got pong 2&quot;</text></g>
+<g class="step"><title>34: Client(2) enters state 'Pinging'.</title><rect class="pill" x="294.8" y="711" width="62.4" height="18" rx="9"/><text class="pill-text" x="326" y="724">Pinging</text></g>
+<g class="step"><title>35: 'Client(2)' in state 'Pinging' sent event 'ePing with payload (&lt;client:Client(2), n:3, &gt;)' to 'Server(3)'.</title><line class="arrow send" x1="326" y1="744" x2="502" y2="768" marker-end="url(#head-send)"/><text class="label " x="334" y="739" text-anchor="start">ePing (Client(2), 3)</text><circle class="dot " cx="326" cy="744" r="3"/></g>
+<g class="step"><title>36: 'Server(3)' dequeued event 'ePing with payload (&lt;client:Client(2), n:3, &gt;)' in state 'Serving'.</title><circle class="hit" cx="506" cy="768" r="8"/></g>
+<g class="step"><title>37: PongsCounted is processing event 'ePong with payload (4)' in state 'Watching'.</title><line class="arrow observe" x1="506" y1="792" x2="682" y2="792" marker-end="url(#head-observe)"/><text class="label mon" x="514" y="787" text-anchor="start">ePong (4)</text><circle class="dot mon" cx="686" cy="792" r="3"/></g>
+<g class="step"><title>38: 'Server(3)' in state 'Serving' sent event 'ePong with payload (4)' to 'Client(2)'.</title><line class="arrow send" x1="506" y1="816" x2="330" y2="840" marker-end="url(#head-send)"/><text class="label " x="498" y="811" text-anchor="end">ePong (4)</text><circle class="dot " cx="506" cy="816" r="3"/></g>
+<g class="step"><title>39: 'Client(2)' dequeued event 'ePong with payload (4)' in state 'Pinging'.</title><circle class="hit" cx="326" cy="840" r="8"/></g>
+<g class="step"><title>40: got pong 4</title><circle class="dot " cx="326" cy="864" r="3"/><text class="label print" x="336" y="868">&quot;got pong 4&quot;</text></g>
+<g class="step"><title>41: Assertion Failed: PSrc/PingPong.p:46:13 expected 3 pongs, got 4</title><circle class="fail" cx="326" cy="888" r="7"/><path class="fail-x" d="M323 885l6 6m0 -6l-6 6"/><text class="label fail-text" x="336" y="892">Assertion Failed: PSrc/PingPong.p:46:13 expected 3 pongs, got 4</text></g>
+</svg>

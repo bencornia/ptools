@@ -64,6 +64,31 @@ changes what happens.
 prdb finds the project's source from the trace's location: the nearest
 directory, from the trace's up, with a `.pproj` file.
 
+## Diagrams
+
+`prdb -diagram` draws a trace as a space-time diagram, in SVG: a column
+for each machine, time running down, and an arrow for each event from the
+step that sent it to the step that dequeued it. An event that waited in an
+inbox while other things happened slants down across those steps, and one
+never dequeued runs dashed off the bottom. Steps are numbered as in the
+debugger, and hovering one shows what PChecker logged for it, payloads in
+full.
+
+```sh
+prdb -diagram -o bug.svg PCheckerOutput/BugFinding/MyProject_0_0.trace.json
+```
+
+![The planted bug in testdata/pingpong: the server counts the third ping twice, and the client's assertion fails](docs/pingpong.svg)
+
+Like `-list`, it takes a trace, a `.schedule` file or `-testcase`, and
+`-schedule`. For a big trace, draw part of it:
+
+| Flag | Draws |
+|---|---|
+| `-machines Client,Server(3)` | only these machines, by type or name; events to others end in a short arrow naming them |
+| `-steps 120-180` | only these steps (also `120-` or `-180`) |
+| `-monitors=false` | no spec monitors |
+
 ## What it can't show
 
 The trace records events, states, payloads and prints, not machines'
@@ -181,4 +206,4 @@ PChecker wrote for it.
 - [x] Choose which schedule of a `--verbose` trace with several to replay
 - [x] Try the VS Code debugger in VS Code itself
 - [ ] Test the Neovim setup
-- [ ] A sequence diagram of a trace, from its vector clocks
+- [x] A space-time diagram of a trace, as SVG

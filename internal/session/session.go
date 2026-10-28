@@ -31,12 +31,16 @@ type Session struct {
 	breakpoints map[string]map[int]bool
 	// stepLines are the lines some step happens on, by file.
 	stepLines map[string]map[int]bool
+	// delivered is, for each step that sends an event, the step that
+	// dequeued or received it, or -1 if none did.
+	delivered []int
 }
 
 // New starts a session at the first step.
 func New(steps []trace.Step, src *source.Index) *Session {
 	s := &Session{Steps: steps, Source: src, breakpoints: map[string]map[int]bool{}, stepLines: map[string]map[int]bool{}}
 	s.locate()
+	s.deliver()
 	for _, l := range s.Where {
 		if l.File != "" {
 			if s.stepLines[l.File] == nil {
@@ -415,21 +419,42 @@ type Message struct {
 func (s *Session) Inbox(machine string) []Message {
 	var inbox []Message
 	for i, step := range s.Steps[:s.Pos+1] {
-		switch {
-		case step.Kind == "SendEvent" && step.Target == machine:
+		if step.Kind == "SendEvent" && step.Target == machine && (s.delivered[i] < 0 || s.delivered[i] > s.Pos) {
 			inbox = append(inbox, Message{Event: step.Event, Payload: step.Payload, Sender: step.Sender, Step: i})
-		case (step.Kind == "DequeueEvent" || step.Kind == "ReceiveEvent") && step.Machine == machine:
-			// The first waiting event like it: events can be taken out of
-			// order by a receive or a deferral.
-			for j, m := range inbox {
-				if m.Event == step.Event && (bytes.Equal(m.Payload, step.Payload) || !step.HasPayload()) {
-					inbox = append(inbox[:j], inbox[j+1:]...)
+		}
+	}
+	return inbox
+}
+
+// Delivered returns the step that dequeued or received the event step i
+// sent, or -1 if none did, or step i doesn't send one.
+func (s *Session) Delivered(i int) int {
+	return s.delivered[i]
+}
+
+// deliver matches each dequeue and receive to the send it took from the
+// machine's inbox: the first waiting event like it, since events can be
+// taken out of order by a receive or a deferral.
+func (s *Session) deliver() {
+	s.delivered = make([]int, len(s.Steps))
+	waiting := map[string][]int{} // sends not yet delivered, by target
+	for i, step := range s.Steps {
+		s.delivered[i] = -1
+		switch step.Kind {
+		case "SendEvent":
+			waiting[step.Target] = append(waiting[step.Target], i)
+		case "DequeueEvent", "ReceiveEvent":
+			inbox := waiting[step.Machine]
+			for j, send := range inbox {
+				sent := s.Steps[send]
+				if sent.Event == step.Event && (bytes.Equal(sent.Payload, step.Payload) || !step.HasPayload()) {
+					s.delivered[send] = i
+					waiting[step.Machine] = append(inbox[:j], inbox[j+1:]...)
 					break
 				}
 			}
 		}
 	}
-	return inbox
 }
 
 // Options are how Open finds and makes what it loads.
