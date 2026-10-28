@@ -6,8 +6,11 @@ package session
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"path/filepath"
+	"strings"
 
+	"github.com/bencornia/prdb/internal/replay"
 	"github.com/bencornia/prdb/internal/source"
 	"github.com/bencornia/prdb/internal/trace"
 )
@@ -429,19 +432,39 @@ func (s *Session) Inbox(machine string) []Message {
 	return inbox
 }
 
-// Open loads a trace and the source of the project it's from. project is
-// the project's directory, or "" to find it: the nearest directory, from
-// the trace's up, with a .pproj file. close frees the parsed source.
-func Open(tracePath, project string) (s *Session, close func(), err error) {
+// Options are how Open finds and makes what it loads.
+type Options struct {
+	// Project is the project's directory, or "" to find it: the nearest
+	// directory, from the trace's up, with a .pproj file.
+	Project string
+	// Compiler runs the P tool, to replay a schedule; "p" by default.
+	Compiler []string
+	// Progress, if not nil, hears what replaying a schedule is doing.
+	Progress io.Writer
+}
+
+// Open loads a trace, or a .schedule file replayed into one, and the
+// source of the project it's from. close frees the parsed source.
+func Open(path string, opts Options) (s *Session, close func(), err error) {
+	project := opts.Project
+	if project == "" {
+		project = FindProject(filepath.Dir(path))
+	}
+	tracePath := path
+	if strings.HasSuffix(path, ".schedule") {
+		replayed, clean, err := replay.Schedule(path, project, opts.Compiler, opts.Progress)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer clean()
+		tracePath = replayed
+	}
 	steps, err := trace.Load(tracePath)
 	if err != nil {
 		return nil, nil, err
 	}
 	if len(steps) == 0 {
-		return nil, nil, fmt.Errorf("%s has no steps", tracePath)
-	}
-	if project == "" {
-		project = FindProject(filepath.Dir(tracePath))
+		return nil, nil, fmt.Errorf("%s has no steps", path)
 	}
 	src, err := source.Load(project)
 	if err != nil {

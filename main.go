@@ -21,12 +21,12 @@ import (
 const version = "0.1.0"
 
 func main() {
-	list := flag.Bool("list", false, "print each step of the trace given as an argument, with its source location")
+	list := flag.Bool("list", false, "print each step of the trace or schedule given as an argument, with its source location")
 	project := flag.String("project", "", "the P project's directory (default: found from the trace's location)")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	verbose := flag.Bool("v", false, "log the protocol messages to stderr")
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: prdb [flags]               (debug adapter, over stdio)\n       prdb -list [flags] trace.json\n")
+		fmt.Fprintf(flag.CommandLine.Output(), "usage: prdb [flags]               (debug adapter, over stdio)\n       prdb -list [flags] trace.json|file.schedule\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -56,7 +56,7 @@ func main() {
 }
 
 func printSteps(tracePath, project string) error {
-	s, closeSession, err := session.Open(tracePath, project)
+	s, closeSession, err := session.Open(tracePath, session.Options{Project: project, Progress: os.Stderr})
 	if err != nil {
 		return err
 	}

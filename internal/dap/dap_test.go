@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -277,6 +279,33 @@ func TestLaunchFromVSCode(t *testing.T) {
 	c.request(&godap.ConfigurationDoneRequest{Request: godap.Request{Command: "configurationDone"}})
 	if s := c.stopped(); s.Reason != "entry" {
 		t.Errorf("stopped %+v", s)
+	}
+	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
+}
+
+func TestLaunchSchedule(t *testing.T) {
+	if _, err := exec.LookPath("p"); err != nil {
+		t.Skip("the P compiler isn't installed")
+	}
+	project := t.TempDir()
+	if err := os.CopyFS(project, os.DirFS("../../testdata/pingpong")); err != nil {
+		t.Fatal(err)
+	}
+	c := connect(t)
+	c.request(&godap.InitializeRequest{Request: godap.Request{Command: "initialize"}})
+	args, _ := json.Marshal(LaunchArguments{Trace: filepath.Join(project, "bug.schedule")})
+	c.request(&godap.LaunchRequest{Request: godap.Request{Command: "launch"}, Arguments: args})
+	c.request(&godap.ConfigurationDoneRequest{Request: godap.Request{Command: "configurationDone"}})
+	if s := c.stopped(); s.Reason != "entry" {
+		t.Errorf("stopped %+v", s)
+	}
+	c.stopped() // the first stop is sent twice, for Helix
+	c.request(&godap.ContinueRequest{Request: godap.Request{Command: "continue"}})
+	if s := c.stopped(); s.Reason != "exception" || !strings.Contains(s.Text, "expected 3 pongs, got 4") {
+		t.Errorf("stopped %+v", s)
+	}
+	if out := c.output("console"); !strings.Contains(out, "Compiling PingPong.pproj\nReplaying bug.schedule\n") {
+		t.Errorf("console %q", out)
 	}
 	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
 }

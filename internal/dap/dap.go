@@ -26,7 +26,8 @@ import (
 
 // LaunchArguments are what a launch request configures.
 type LaunchArguments struct {
-	// Trace is the PChecker trace to step through, a .trace.json file.
+	// Trace is the PChecker trace to step through, a .trace.json file, or
+	// a .schedule file, which is compiled and replayed into a trace.
 	Trace string `json:"trace"`
 	// Project is the P project's directory. By default it's the nearest
 	// directory, from the trace's up, with a .pproj file.
@@ -34,6 +35,8 @@ type LaunchArguments struct {
 	// StopOnEntry stops at the first step. It's true unless set false;
 	// otherwise the session runs to the first breakpoint.
 	StopOnEntry *bool `json:"stopOnEntry"`
+	// Compiler runs the P tool, to replay a schedule; "p" by default.
+	Compiler []string `json:"compiler"`
 }
 
 // Serve speaks the protocol on r and w until the client disconnects. If
@@ -236,7 +239,9 @@ func (s *server) launch(req *godap.LaunchRequest) {
 		s.fail(req, "launch needs a trace: the .trace.json file PChecker wrote")
 		return
 	}
-	sess, closeSession, err := session.Open(args.Trace, args.Project)
+	sess, closeSession, err := session.Open(args.Trace, session.Options{
+		Project: args.Project, Compiler: args.Compiler, Progress: consoleWriter{s},
+	})
 	if err != nil {
 		s.fail(req, err.Error())
 		return
@@ -327,6 +332,14 @@ func (s *server) writeStep(i int) {
 
 func (s *server) output(category, text string) {
 	s.send(&godap.OutputEvent{Event: event("output"), Body: godap.OutputEventBody{Category: category, Output: text}})
+}
+
+// consoleWriter writes to the debug console.
+type consoleWriter struct{ s *server }
+
+func (w consoleWriter) Write(p []byte) (int, error) {
+	w.s.output("console", string(p))
+	return len(p), nil
 }
 
 func (s *server) stopped(reason string) {

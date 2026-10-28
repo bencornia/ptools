@@ -42,6 +42,14 @@ When PChecker finds a bug, it writes
 debug. To step through a run that didn't fail, run `p check` with
 `--verbose` (`-v`), which writes `<Project>_0_verbose.trace.json` either way.
 
+Or debug the `.schedule` file PChecker writes beside the trace. prdb
+compiles the project and replays the schedule with `p check --replay`, which
+is deterministic, to make the trace itself. This needs the P compiler: `p`
+on the `PATH`, or, for an editor started without your shell's `PATH`, where
+`dotnet tool install --global P` puts it, `~/.dotnet/tools/p`. It replays
+against the source as it is now, so it's the way to see whether a fix
+changes what happens.
+
 prdb finds the project's source from the trace's location: the nearest
 directory, from the trace's up, with a `.pproj` file.
 
@@ -67,7 +75,7 @@ git config --global url."git@github.com:".insteadOf "https://github.com/"
 ```
 
 `prdb -list trace.json` prints each step of a trace with its source
-location, without an editor.
+location, without an editor. It takes a `.schedule` file too.
 
 ## VS Code
 
@@ -83,8 +91,8 @@ code --install-extension p-lsp-0.2.0.vsix
 ```
 
 Open a `.p` file and start debugging (F5, or Run and Debug): with no
-`launch.json`, it asks which of the workspace's traces to replay, newest
-first. To keep a configuration, add one with the "P: Replay a trace" snippet:
+`launch.json`, it asks which of the workspace's traces and schedules to
+replay, newest first. To keep a configuration, add one with the "P: Replay a trace" snippet:
 
 ```json
 {
@@ -126,9 +134,10 @@ step forward through a trace.
 
 | Argument | |
 |---|---|
-| `trace` | The `.trace.json` file to replay. Required. |
+| `trace` | The `.trace.json` file to replay, or a `.schedule` file to compile and replay. Required. |
 | `project` | The P project's directory, if it can't be found from the trace's. |
 | `stopOnEntry` | Stop at the first step; true unless set false, which runs to the first breakpoint. |
+| `compiler` | The command that runs the P tool, to replay a schedule: `["p"]` by default. |
 
 ## Developing
 
@@ -146,7 +155,7 @@ PChecker wrote for it.
 - [x] Debug adapter: a thread per machine, stepping both ways, breakpoints, payloads and inboxes, stopping at the failed assertion
 - [x] `prdb -list`
 - [x] VS Code: the debugger in p-lsp's VS Code extension, with a trace picker
-- [ ] Launch from a `.schedule` file, replaying it with `p check --replay -v`
+- [x] Launch from a `.schedule` file, replaying it with `p check --replay -v`
 - [ ] Launch a test case: run `p check` to find a bug, then replay it
 - [ ] Choose which schedule of a `--verbose` trace with several to replay
 - [x] Try the VS Code debugger in VS Code itself

@@ -10,7 +10,7 @@ const fixture = "../../testdata/pingpong"
 
 func open(t *testing.T) *Session {
 	t.Helper()
-	s, closeSession, err := Open(filepath.Join(fixture, "bug.trace.json"), "")
+	s, closeSession, err := Open(filepath.Join(fixture, "bug.trace.json"), Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
