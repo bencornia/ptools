@@ -55,9 +55,23 @@ func Serve(r io.Reader, w io.Writer, log io.Writer) error {
 	s := &server{in: bufio.NewReader(r), out: w, log: log, pendingBreakpoints: map[string][]int{}}
 	defer s.close()
 	for {
-		msg, err := godap.ReadProtocolMessage(s.in)
+		data, err := godap.ReadBaseMessage(s.in)
 		if errors.Is(err, io.EOF) {
 			return nil
+		}
+		if err != nil {
+			return err
+		}
+		msg, err := codec.DecodeMessage(data)
+		var unknown *godap.DecodeProtocolMessageFieldError
+		if errors.As(err, &unknown) && unknown.SubType == "Request" {
+			// A request prdb doesn't know, which mustn't end the session.
+			s.logf("<- %s", data)
+			s.send(&godap.ErrorResponse{Response: godap.Response{
+				RequestSeq: unknown.Seq, Command: unknown.FieldValue,
+				Message: fmt.Sprintf("%s isn't supported", unknown.FieldValue),
+			}})
+			continue
 		}
 		if err != nil {
 			return err
@@ -226,6 +240,13 @@ func (s *server) handle(msg godap.Message) bool {
 		s.send(&godap.ExceptionInfoResponse{Response: response(req), Body: godap.ExceptionInfoResponseBody{
 			ExceptionId: "AssertionFailure", Description: step.Error, BreakMode: "always",
 		}})
+
+	case *DiagramRequest:
+		s.diagram(m)
+	case *StepRequest:
+		s.send(&StepResponse{Response: response(req), Body: StepBody{Step: s.session.Pos + 1}})
+	case *GotoStepRequest:
+		s.gotoStep(m)
 
 	case *godap.DisconnectRequest:
 		s.send(&godap.DisconnectResponse{Response: response(req)})

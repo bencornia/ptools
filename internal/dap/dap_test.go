@@ -38,10 +38,15 @@ func connect(t *testing.T) *client {
 	go func() {
 		r := bufio.NewReader(toClient)
 		for {
-			msg, err := godap.ReadProtocolMessage(r)
+			data, err := godap.ReadBaseMessage(r)
 			if err != nil {
 				close(c.messages)
 				return
+			}
+			msg, err := codec.DecodeMessage(data)
+			if err != nil {
+				t.Errorf("decoding %s: %v", data, err)
+				continue
 			}
 			c.messages <- msg
 		}
@@ -339,6 +344,62 @@ func TestLaunchTestCase(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("console %q lacks %q", out, want)
 		}
+	}
+	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
+}
+
+func TestDiagramRequests(t *testing.T) {
+	t.Chdir("../../testdata/pingpong")
+	c := connect(t)
+	c.request(&godap.InitializeRequest{Request: godap.Request{Command: "initialize"}})
+	c.request(&godap.LaunchRequest{Request: godap.Request{Command: "launch"}, Arguments: json.RawMessage(`{"trace": "bug.trace.json"}`)})
+	c.request(&godap.ConfigurationDoneRequest{Request: godap.Request{Command: "configurationDone"}})
+	c.stopped()
+	c.stopped() // the first stop is sent twice, for Helix
+
+	d := c.request(&DiagramRequest{Request: godap.Request{Command: "prdbDiagram"}}).(*DiagramResponse)
+	if d.Body.Step != 1 || !strings.HasPrefix(d.Body.SVG, "<svg") || !strings.Contains(d.Body.SVG, `<g class="step" data-step="41">`) {
+		t.Errorf("diagram at step %d: %.80s", d.Body.Step, d.Body.SVG)
+	}
+
+	c.request(&GotoStepRequest{Request: godap.Request{Command: "prdbGoto"}, Arguments: StepBody{Step: 20}})
+	if s := c.stopped(); s.Reason != "goto" || s.Description != "step 20 of 41" {
+		t.Errorf("stopped %+v", s)
+	}
+	if step := c.request(&StepRequest{Request: godap.Request{Command: "prdbStep"}}).(*StepResponse).Body.Step; step != 20 {
+		t.Errorf("at step %d, not 20", step)
+	}
+	c.request(&GotoStepRequest{Request: godap.Request{Command: "prdbGoto"}, Arguments: StepBody{Step: 41}})
+	if s := c.stopped(); s.Reason != "exception" {
+		t.Errorf("stopped %+v at the failed assertion", s)
+	}
+
+	// Requests prdb doesn't know, or can't do, fail without ending the
+	// session.
+	for _, raw := range []string{
+		`{"seq": 100, "type": "request", "command": "noSuchRequest"}`,
+		`{"seq": 101, "type": "request", "command": "prdbGoto", "arguments": {"step": 42}}`,
+	} {
+		if err := godap.WriteBaseMessage(c.w, []byte(raw)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for failed := 0; failed < 2; {
+		select {
+		case msg := <-c.messages:
+			if r, ok := msg.(godap.ResponseMessage); ok && r.GetResponse().RequestSeq >= 100 {
+				if r.GetResponse().Success {
+					t.Errorf("%s succeeded", r.GetResponse().Command)
+				}
+				failed++
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatal("no response to a request that can't be done")
+		}
+	}
+	c.seq = 101
+	if step := c.request(&StepRequest{Request: godap.Request{Command: "prdbStep"}}).(*StepResponse).Body.Step; step != 41 {
+		t.Errorf("at step %d, not 41", step)
 	}
 	c.request(&godap.DisconnectRequest{Request: godap.Request{Command: "disconnect"}})
 }

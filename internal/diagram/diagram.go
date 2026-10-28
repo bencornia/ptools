@@ -195,6 +195,11 @@ func (d *diagram) draw() {
 		}
 		d.printf(`<text class="num" x="%d" y="%g">%d</text>`+"\n", gutter-labelGo, d.y(row)+4, i+1)
 	}
+	// Each step's row, marked with its number, for a viewer to highlight
+	// or click.
+	for row, i := range d.steps {
+		d.printf(`<rect class="row" data-step="%d" x="0" y="%g" width="%g" height="%d"/>`+"\n", i+1, d.y(row)-rowH/2, width, rowH)
+	}
 	d.out.WriteString(body)
 	d.printf("</svg>\n")
 }
@@ -252,7 +257,7 @@ func (d *diagram) step(row, i int) {
 	if step.Kind == "SendEvent" && d.s.Delivered(i) < 0 {
 		title += " It was never dequeued."
 	}
-	d.printf(`<g class="step"><title>%d: %s</title>`, i+1, esc(title))
+	d.printf(`<g class="step" data-step="%d"><title>%d: %s</title>`, i+1, i+1, esc(title))
 	switch step.Kind {
 	case "CreateStateMachine", "CreateMonitor":
 		if _, ok := d.col[step.Creator]; ok {
@@ -514,7 +519,7 @@ text { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill
 .fail-x, .halt-x { stroke: var(--bg); stroke-width: 2; }
 .fail-text { fill: var(--fail); font-weight: 600; }
 .halt { fill: var(--muted); }
-.hit { fill: transparent; }
+.hit, .row { fill: transparent; }
 .step:hover .arrow { stroke-width: 3; }
 .step:hover text.label { text-decoration: underline; }
 </style>

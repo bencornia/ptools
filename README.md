@@ -143,13 +143,20 @@ trace" snippet:
 }
 ```
 
-Set `trace` to a path, relative to the workspace folder, to skip the
-picker. If the trace is a `--verbose` one with several schedules, it asks
-which to replay, unless `schedule` says. The "P: Find a bug in a test case" snippet adds one that checks
-a test case, with `"testcase": "${command:pickTestCase}"`.
+Set `trace` to a path, relative to the workspace folder, to skip the picker.
+If the trace is a `--verbose` one with several schedules, it asks which to
+replay, unless `schedule` says. The "P: Find a bug in a test case" snippet
+adds one that checks a test case, with
+`"testcase": "${command:pickTestCase}"`.
+
 Breakpoints go in the gutter of `.p` files; the toolbar's Step Back and
 Reverse buttons move backward. Set `prdb.path` if `prdb` isn't on the `PATH`
 VS Code sees, and `prdb.args` to `["-v"]` to log the protocol.
+
+The debug toolbar's Show Trace Diagram button (or "P: Show Trace Diagram")
+opens the trace's [diagram](#diagrams) beside the editor, in the editor's
+colours. The current step is highlighted, and follows the debugger; click a
+step to go there.
 
 ## Other editors
 
@@ -197,6 +204,20 @@ step forward through a trace.
 | `schedule` | Which of a `--verbose` trace's schedules to replay, counting from 1: the last by default. In VS Code, a trace with several asks which. |
 | `schedules` | How many schedules to explore for a bug in `testcase`: 1000 by default. |
 | `compiler` | The command that runs the P tool, to replay a schedule or check a test case: `["p"]` by default. |
+
+## Protocol
+
+Besides the Debug Adapter Protocol's requests, prdb answers three of its
+own, for a client showing the diagram. Steps count from 1.
+
+| Request | Arguments | Response body |
+|---|---|---|
+| `prdbDiagram` | | `svg`: the trace's diagram; `step`: the current step |
+| `prdbStep` | | `step`: the current step |
+| `prdbGoto` | `step` | none; the replay moves there and stops, with reason `goto` |
+
+In the SVG, each step's row is a `rect` with class `row`, and what's drawn
+for it a `g` with class `step`, both with a `data-step` attribute.
 
 ## Developing
 
