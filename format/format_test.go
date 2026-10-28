@@ -40,6 +40,12 @@ func TestSource(t *testing.T) {
 		{"comments stay", "// top\n\n\n\nevent e;   // trailing\n/* block\n   comment */\nfun F() {\n    // inside\n  x = 1;\n}\n",
 			"// top\n\nevent e;   // trailing\n/* block\n   comment */\nfun F() {\n  // inside\n  x = 1;\n}\n"},
 		{"trailing whitespace and final newline", "event e;   \n\n\nevent f;", "event e;\n\nevent f;\n"},
+		{"blank lines between states",
+			"machine M {\n  var x: int;\n  start state A {\n    entry {\n    }\n    exit {\n    }\n  }\n  // B waits.\n  state B { }\n  state C { entry f; exit f; }\n  fun f() { }\n}\n",
+			"machine M {\n  var x: int;\n  start state A {\n    entry {\n    }\n\n    exit {\n    }\n  }\n\n  // B waits.\n  state B {}\n\n  state C { entry f; exit f; }\n  fun f() {}\n}\n"},
+		{"exit only right after entry",
+			"machine M {\n  start state A {\n    entry f;\n    on e goto A;\n    exit f;\n  }\n}\n",
+			"machine M {\n  start state A {\n    entry f;\n    on e goto A;\n    exit f;\n  }\n}\n"},
 		{"leading blank lines", "\n\nevent e;\n", "event e;\n"},
 		{"empty", "", ""},
 	}

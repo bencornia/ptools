@@ -2,7 +2,9 @@
 //
 // It keeps the code's tokens, their order, the line breaks between them, and
 // comments, and normalizes the whitespace: indentation, the spacing between
-// tokens on a line, blank lines, and the end of the file. Like gofmt, it
+// tokens on a line, blank lines, and the end of the file. It separates
+// states, and an entry handler from the exit handler after it, with a blank
+// line, if they're on lines of their own. Like gofmt, it
 // refuses code with syntax errors, and it checks its own output: if
 // formatting would change anything but whitespace, it returns an error.
 package format
@@ -83,6 +85,9 @@ type token struct {
 	// newlines is how many line breaks came before the token, and spaces
 	// how many spaces, if it was on the same line as the token before.
 	newlines, spaces int
+	// separated is whether the token starts something set apart from what
+	// comes before it by a blank line; see separated.
+	separated bool
 }
 
 // tokenize returns the leaves of tree in order, with the whitespace between
@@ -90,8 +95,12 @@ type token struct {
 func tokenize(src []byte, tree *sitter.Tree) ([]token, error) {
 	var tokens []token
 	pos := uint(0)
+	pending := false
 	var walk func(n *sitter.Node, parent string) error
 	walk = func(n *sitter.Node, parent string) error {
+		if separated(n) {
+			pending = true
+		}
 		if n.ChildCount() == 0 {
 			if n.EndByte() == n.StartByte() {
 				return nil
@@ -111,8 +120,9 @@ func tokenize(src []byte, tree *sitter.Tree) ([]token, error) {
 			}
 			tokens = append(tokens, token{
 				text: text, kind: n.Kind(), parent: parent, named: n.IsNamed(),
-				newlines: newlines, spaces: spaces,
+				newlines: newlines, spaces: spaces, separated: pending,
 			})
+			pending = false
 			pos = n.EndByte()
 			return nil
 		}
@@ -129,7 +139,46 @@ func tokenize(src []byte, tree *sitter.Tree) ([]token, error) {
 	if rest := src[pos:]; len(bytes.TrimSpace(rest)) > 0 {
 		return nil, fmt.Errorf("unexpected %q at the end; this is a bug in pfmt", rest)
 	}
+	separate(tokens)
 	return tokens, nil
+}
+
+// separated reports whether n goes after a blank line: a state after
+// another state, or an exit handler right after an entry handler.
+func separated(n *sitter.Node) bool {
+	prev := n.PrevNamedSibling()
+	for prev != nil && prev.Kind() == "comment" {
+		prev = prev.PrevNamedSibling()
+	}
+	if prev == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "machine_entry":
+		return isState(n) && isState(prev)
+	case "state_exit_anon", "state_exit_fun":
+		return prev.Kind() == "state_entry_anon" || prev.Kind() == "state_entry_fun"
+	}
+	return false
+}
+
+func isState(entry *sitter.Node) bool {
+	return entry.Kind() == "machine_entry" && entry.NamedChildCount() > 0 && entry.NamedChild(0).Kind() == "state_declaration"
+}
+
+// separate puts a blank line before each separated token on a line of its
+// own, and before the comments on the lines just above it.
+func separate(tokens []token) {
+	for i := range tokens {
+		if !tokens[i].separated || tokens[i].newlines == 0 {
+			continue
+		}
+		j := i
+		for j > 0 && tokens[j].newlines == 1 && tokens[j-1].kind == "comment" && tokens[j-1].newlines > 0 {
+			j--
+		}
+		tokens[j].newlines = max(tokens[j].newlines, 2)
+	}
 }
 
 func sameTokens(a, b []token) bool {

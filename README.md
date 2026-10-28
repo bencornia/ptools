@@ -14,6 +14,9 @@ between them, and comments. It normalizes the whitespace:
   `:` in `x: int`, none between a function and its `(`, and one between a
   keyword and its `(`, as in `if (x)`.
 - Blank lines: runs of them become one, with none at the start of the file.
+- Blank lines between states, and between an `entry` handler and the `exit`
+  handler after it, when they start lines of their own; comments just above
+  stay with what they describe.
 - Trailing whitespace is removed, and the file ends with one newline.
 
 Trailing comments keep their alignment.
