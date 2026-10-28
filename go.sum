@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1 h1:HwpRHbFMcZLEVr42D4p7XBqjyuxQH5SMiErDT4WkJ2k=
 github.com/aymanbagabas/go-osc52/v2 v2.0.1/go.mod h1:uYgXzlJ7ZpABp8OJ+exZzJJhRNQ2ASbcXHWsFqH8hp8=
-github.com/bencornia/pfmt v0.0.0-20261028142350-f799895e073f h1:Q+EOdrPjmIqhwvnqPQ4Nwo5pDrGTAh99t8yemZ4Ghcs=
-github.com/bencornia/pfmt v0.0.0-20261028142350-f799895e073f/go.mod h1:kQ53tKyupAVsUj+LD0/qnWSWAMPP+fyj37qpTNpF16I=
+github.com/bencornia/pfmt v0.0.0-20261028143211-ce5fc6b65d08 h1:hfDt1OwF/Z/4T8cIq7WB+ZzFnAD33njUf7BY3LdxS90=
+github.com/bencornia/pfmt v0.0.0-20261028143211-ce5fc6b65d08/go.mod h1:kQ53tKyupAVsUj+LD0/qnWSWAMPP+fyj37qpTNpF16I=
 github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a h1:FeFLGhbFp5Ms1H2JbM2sZjYPPiz73S0lephjJyLWS+o=
 github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a/go.mod h1:EUT4ZH1JlTxM2a7G6u6C02u4JZDNdLDu/SwTLLQlU7g=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
