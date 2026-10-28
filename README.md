@@ -72,7 +72,7 @@ step that sent it to the step that dequeued it. An event that waited in an
 inbox while other things happened slants down across those steps, and one
 never dequeued runs dashed off the bottom. Steps are numbered as in the
 debugger, and hovering one shows what PChecker logged for it, payloads in
-full.
+full. In a long diagram, the machines' names are repeated every 36 steps.
 
 ```sh
 prdb -diagram -o bug.svg PCheckerOutput/BugFinding/MyProject_0_0.trace.json

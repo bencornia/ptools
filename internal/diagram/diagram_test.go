@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -141,5 +142,21 @@ func TestFit(t *testing.T) {
 	}
 	if got := fit("short", 10*charW); got != "short" {
 		t.Errorf("fit = %q", got)
+	}
+}
+
+func TestSVGRepeatsNames(t *testing.T) {
+	full := open(t)
+	if svg := draw(t, full, Options{}); strings.Contains(svg, "name repeat") {
+		t.Error("repeats the names in a diagram of fewer than 36 rows")
+	}
+	// The trace twice over: 68 rows, so the names again before the 37th.
+	steps := append(slices.Clone(full.Steps), full.Steps...)
+	svg := draw(t, session.New(steps, full.Source), Options{})
+	if n := strings.Count(svg, `class="name repeat`); n != 4 {
+		t.Errorf("repeats %d names, not the 4 machines'", n)
+	}
+	if !strings.Contains(svg, `class="name repeat"><title>Main(1)</title>`) {
+		t.Error("no repeated name for Main(1)")
 	}
 }

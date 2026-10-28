@@ -39,6 +39,12 @@ const (
 	charW   = 7.2 // width of a character of 12px monospace text
 	margin  = 16
 	labelGo = 8 // gap between a lifeline and a label beside it
+	// every is how many rows go between the machines' names, repeated
+	// down a long diagram so its columns can be told apart anywhere.
+	every = 36
+	// nameH is the height of a row of repeated names: room for the
+	// boxes, clear of the steps either side.
+	nameH = 40
 )
 
 // SVG writes the diagram of s's steps.
@@ -65,7 +71,9 @@ type diagram struct {
 	rows  map[int]int
 	// right is the x of the right end of the furthest text.
 	right float64
-	out   strings.Builder
+	// life is the top and end of each machine's lifeline.
+	life map[string][2]float64
+	out  strings.Builder
 }
 
 func newDiagram(s *session.Session, opts Options) *diagram {
@@ -141,8 +149,10 @@ func (d *diagram) x(machine string) float64 {
 	return gutter + float64(d.col[machine])*colW + colW/2
 }
 
+// y is the middle of a step's row, below the rows of repeated names before
+// it.
 func (d *diagram) y(row int) float64 {
-	return headH + margin + float64(row)*rowH + rowH/2
+	return headH + margin + float64(row)*rowH + float64(row/every)*nameH + rowH/2
 }
 
 // bottom is the y of the end of the lifelines.
@@ -157,10 +167,14 @@ func (d *diagram) printf(format string, args ...any) {
 func (d *diagram) draw() {
 	height := d.bottom() + margin + headH
 	d.lifelines()
-	d.names(headH / 2)
-	d.names(height - headH/2)
+	d.names(headH/2, "")
+	d.names(height-headH/2, "")
 	for row, i := range d.steps {
 		d.step(row, i)
+	}
+	// On top of the arrows, which pass behind them.
+	for row := every; row < len(d.steps); row += every {
+		d.names(d.y(row)-rowH/2-nameH/2, "repeat")
 	}
 	body := d.out.String()
 	width := max(gutter+float64(len(d.machines))*colW, d.right) + margin
@@ -188,36 +202,43 @@ func (d *diagram) draw() {
 // lifelines draws each machine's line, from its creation, or the top, to
 // its halting, or the bottom.
 func (d *diagram) lifelines() {
+	d.life = map[string][2]float64{}
 	for _, m := range d.machines {
 		top, end := float64(headH), d.bottom()+margin
+		created, halted := false, false
 		for row, i := range d.steps {
 			step := d.s.Steps[i]
 			if step.Machine != m {
 				continue
 			}
-			switch step.Kind {
-			case "CreateStateMachine", "CreateMonitor":
-				top = d.y(row)
-			case "Halt":
-				end = d.y(row)
+			switch {
+			case (step.Kind == "CreateStateMachine" || step.Kind == "CreateMonitor") && !created:
+				top, created = d.y(row), true
+			case step.Kind == "Halt" && !halted:
+				end, halted = d.y(row), true
 			}
 		}
 		class := "life"
 		if d.monitor[m] {
 			class = "life mon"
 		}
+		d.life[m] = [2]float64{top, end}
 		d.printf(`<line class="%s" x1="%g" y1="%g" x2="%g" y2="%g"/>`+"\n", class, d.x(m), top, d.x(m), end)
 	}
 }
 
-// names draws the machines' names, centered on y.
-func (d *diagram) names(y float64) {
+// names draws the machines' names, centered on y. Repeated down the
+// diagram, they're only on the lifelines there.
+func (d *diagram) names(y float64, repeat string) {
 	for _, m := range d.machines {
+		if life := d.life[m]; repeat != "" && (y < life[0] || y > life[1]) {
+			continue
+		}
 		name := fit(m, colW-24)
 		w := float64(len(name))*charW + 16
-		class := "name"
+		class := strings.TrimSpace("name " + repeat)
 		if d.monitor[m] {
-			class = "name mon"
+			class += " mon"
 		}
 		d.printf(`<g class="%s"><title>%s</title><rect x="%g" y="%g" width="%g" height="24" rx="4"/><text x="%g" y="%g">%s</text></g>`+"\n",
 			class, esc(m), d.x(m)-w/2, y-12, w, d.x(m), y+4, esc(name))
@@ -471,6 +492,7 @@ text { font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; fill
 .name rect { fill: var(--bg); stroke: var(--fg); }
 .name.mon rect { stroke: var(--mon); stroke-dasharray: 4 3; }
 .name text { text-anchor: middle; font-weight: 600; }
+.name.repeat { opacity: 0.8; }
 .name.mon text { fill: var(--mon); }
 .arrow { stroke: var(--accent); stroke-width: 1.5; fill: none; }
 .arrow.open { stroke-dasharray: 6 4; }
