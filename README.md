@@ -13,14 +13,17 @@ between them, and comments. It normalizes the whitespace:
 - Spacing on a line: around operators, after commas, before `{`, after the
   `:` in `x: int`, none between a function and its `(`, and one between a
   keyword and its `(`, as in `if (x)`.
-- Blank lines: runs of them become one, with none at the start of the file.
+- Blank lines: runs of them become one, with none at the start of the file,
+  and none after a `{` or before a `}`.
 - Blank lines between states; between an `entry` handler and the `exit`
   handler after it; and around a state's handlers that take more than one
   line, when they start lines of their own; comments just above
   stay with what they describe.
 - Trailing whitespace is removed, and the file ends with one newline.
 
-Trailing comments keep their alignment.
+Comments at the ends of consecutive lines line up, one space past the
+longest line's code, as gofmt lines them up; a blank line, or a line without
+one, starts a new group. Asciidoc callouts like `// <.>` line up in a column.
 
 pfmt refuses code with syntax errors. It also checks its own output: if
 formatting would change anything but whitespace, it reports an error instead.
@@ -117,7 +120,7 @@ changes nothing. All of github.com/p-org/P passes.
 ## TODO
 
 - [x] Format whitespace: indentation, spacing on a line, blank lines, file end
-- [x] Keep line breaks and comments, and trailing comments' alignment
+- [x] Keep line breaks and comments, and align trailing comments
 - [x] Refuse code with syntax errors, and check that output has the same tokens
 - [x] `pfmt` command: stdin, files and directories, `-w`, `-l`, `-indent`
 - [x] Tests, and a corpus test over the P repo

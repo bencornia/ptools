@@ -2,7 +2,8 @@
 //
 // It keeps the code's tokens, their order, the line breaks between them, and
 // comments, and normalizes the whitespace: indentation, the spacing between
-// tokens on a line, blank lines, and the end of the file. It separates
+// tokens on a line, blank lines, and the end of the file. Blocks don't
+// start or end with blank lines. It separates
 // states, and an entry handler from the exit handler after it, with a blank
 // line, if they're on lines of their own. Like gofmt, it
 // refuses code with syntax errors, and it checks its own output: if
@@ -14,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	tree_sitter_p "github.com/bencornia/tree-sitter-p/bindings/go"
 	sitter "github.com/tree-sitter/go-tree-sitter"
@@ -225,6 +227,10 @@ func render(tokens []token, unit string) []byte {
 	var stack []open
 	level := 0                // the current line's indentation level
 	var prev, prevCode *token // prevCode skips comments
+	line := 0                 // the line being written
+	// trailing maps each line ending in a comment after code to where the
+	// code ends, for aligning the comments.
+	trailing := map[int]int{}
 
 	for i := range tokens {
 		t := &tokens[i]
@@ -232,16 +238,25 @@ func render(tokens []token, unit string) []byte {
 		switch {
 		case prev == nil:
 		case t.newlines > 0:
-			out.WriteString(strings.Repeat("\n", min(t.newlines, 2)))
+			newlines := min(t.newlines, 2)
+			if !prev.named && prev.text == "{" || !t.named && t.text == "}" {
+				// No blank line starts or ends a block.
+				newlines = 1
+			}
+			out.WriteString(strings.Repeat("\n", newlines))
+			line += newlines
 			level, popped = lineIndent(t, prevCode, &stack)
 			out.WriteString(strings.Repeat(unit, level))
 		case t.kind == "comment":
-			// Trailing comments keep their alignment.
-			out.WriteString(strings.Repeat(" ", max(t.spaces, 1)))
+			if i+1 == len(tokens) || tokens[i+1].newlines > 0 && !strings.Contains(t.text, "\n") {
+				trailing[line] = out.Len() - (bytes.LastIndexByte(out.Bytes(), '\n') + 1)
+			}
+			out.WriteByte(' ')
 		case space(prev, t):
 			out.WriteByte(' ')
 		}
 		out.WriteString(t.text)
+		line += strings.Count(t.text, "\n")
 
 		if !t.named {
 			switch t.text {
@@ -259,7 +274,38 @@ func render(tokens []token, unit string) []byte {
 		}
 	}
 	out.WriteByte('\n')
-	return out.Bytes()
+	return align(out.Bytes(), trailing)
+}
+
+// align lines up the comments that end consecutive lines, as gofmt does:
+// each comment in a run of such lines goes one space past the longest of
+// their code. trailing maps each line ending in a comment after code to
+// where its code ends.
+func align(out []byte, trailing map[int]int) []byte {
+	if len(trailing) == 0 {
+		return out
+	}
+	lines := strings.Split(string(out), "\n")
+	for i := 0; i < len(lines); {
+		if _, ok := trailing[i]; !ok {
+			i++
+			continue
+		}
+		j, width := i, 0
+		for ; j < len(lines); j++ {
+			end, ok := trailing[j]
+			if !ok {
+				break
+			}
+			width = max(width, utf8.RuneCountInString(lines[j][:end]))
+		}
+		for k := i; k < j; k++ {
+			code, comment := lines[k][:trailing[k]], strings.TrimLeft(lines[k][trailing[k]:], " ")
+			lines[k] = code + strings.Repeat(" ", width-utf8.RuneCountInString(code)+1) + comment
+		}
+		i = j
+	}
+	return []byte(strings.Join(lines, "\n"))
 }
 
 // lineIndent returns the indentation level of a line starting with t, and
