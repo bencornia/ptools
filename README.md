@@ -165,8 +165,21 @@ dap.configurations.p = {
     name = 'Replay a P trace',
     trace = function() return vim.fn.input('Trace: ', '', 'file') end,
   },
+  {
+    type = 'prdb',
+    request = 'launch',
+    name = 'Find a bug in a P test case',
+    testcase = function() return vim.fn.input('Test case: ') end,
+  },
 }
 ```
+
+`dap.continue()` asks which to use. The trace can be a `.schedule` file
+too. A test case's project is found from Neovim's current directory, so
+start it in the project, or add `project` to the configuration. nvim-dap
+maps no keys itself; stepping back is `dap.step_back()`, and reverse
+continue `dap.reverse_continue()`. For Neovim to know `.p` files as P, see
+p-lsp's README.
 
 Helix's debugger support is experimental, and has no step back. prdb works
 around its not selecting the thread at the first stop, so with a
@@ -205,5 +218,5 @@ PChecker wrote for it.
 - [x] Launch a test case: run `p check` to find a bug, then replay it
 - [x] Choose which schedule of a `--verbose` trace with several to replay
 - [x] Try the VS Code debugger in VS Code itself
-- [ ] Test the Neovim setup
+- [x] Test the Neovim setup
 - [x] A space-time diagram of a trace, as SVG
