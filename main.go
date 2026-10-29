@@ -2,7 +2,8 @@
 //
 // Run as p-lsp lint [-json] [path ...], it checks P files for lint problems
 // instead: naming, unused declarations, and the other checks .plint.toml
-// configures.
+// configures. Run as p-lsp doc [-o dir] [-private] [path ...], it writes
+// AsciiDoc reference documentation for P projects.
 package main
 
 import (
@@ -22,6 +23,9 @@ const version = "0.1.0"
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "lint" {
 		os.Exit(lint(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "doc" {
+		os.Exit(docs(os.Args[2:], os.Stdout, os.Stderr))
 	}
 
 	showVersion := flag.Bool("version", false, "print the version and exit")

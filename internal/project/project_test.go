@@ -78,6 +78,13 @@ func TestParse(t *testing.T) {
 	if !reflect.DeepEqual(p.Includes, wantIncludes) {
 		t.Errorf("Includes = %v\nwant %v", p.Includes, wantIncludes)
 	}
+	if p.Name != "App" {
+		t.Errorf("Name = %q", p.Name)
+	}
+	// With no <ProjectName>, the file's name.
+	if timer, err := Parse(filepath.Join(root, "Common/Timer/Timer.pproj")); err != nil || timer.Name != "Timer" {
+		t.Errorf("Timer's Name = %q, %v", timer.Name, err)
+	}
 }
 
 func TestParseInvalidXML(t *testing.T) {

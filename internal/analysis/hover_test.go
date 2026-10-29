@@ -11,7 +11,9 @@ const hoverTypes = `// A request from a client.
 // Second line.
 type tReq = (source: machine, amount: int);
 
-/* Payload-free ping. */
+/*****************
+ * Payload-free ping.
+ *****************/
 event ePing;
 
 enum tColor { RED, GREEN }
@@ -96,10 +98,10 @@ func TestHover(t *testing.T) {
 		{"parameter", "x + 1", 0, code("x: int")},
 		{"local variable has no doc comment", "req = (", 0, code("var req: tReq")},
 		{"tuple value field", "amount = 1", 0, code("amount: int") + "\n\nDeclared in `types.p`, line 3"},
-		{"event with a /* */ comment", "ePing;", 0, code("event ePing;") + "\n\nPayload-free ping.\n\nDeclared in `types.p`, line 6"},
-		{"comment separated by a blank line", "eLonely", 0, code("event eLonely;") + "\n\nDeclared in `types.p`, line 12"},
-		{"a callout on the line above isn't a doc comment", "eCallout", 0, code("event eCallout;") + "\n\nDeclared in `types.p`, line 13"},
-		{"enum element", "RED;", 0, code("enum tColor { RED, GREEN }") + "\n\nDeclared in `types.p`, line 8"},
+		{"event with a /* */ comment", "ePing;", 0, code("event ePing;") + "\n\nPayload-free ping.\n\nDeclared in `types.p`, line 8"},
+		{"comment separated by a blank line", "eLonely", 0, code("event eLonely;") + "\n\nDeclared in `types.p`, line 14"},
+		{"a callout on the line above isn't a doc comment", "eCallout", 0, code("event eCallout;") + "\n\nDeclared in `types.p`, line 15"},
+		{"enum element", "RED;", 0, code("enum tColor { RED, GREEN }") + "\n\nDeclared in `types.p`, line 10"},
 		{"global parameter", "color ==", 0, code("param color: tColor")},
 		{"machine", "c: Client", 3, code("machine Client")},
 		{"invariant in a Lemma", "lemmas_waiting", 0, code("lemmas_waiting: forall (c: Client) :: c is Done;")},

@@ -14,6 +14,9 @@ import (
 type Project struct {
 	// Path is the .pproj file.
 	Path string
+	// Name is the project's <ProjectName>, or the file's name without
+	// its extension if it has none.
+	Name string
 	// Files are the .p files the project lists in <InputFiles>, with
 	// directories expanded.
 	Files []string
@@ -22,7 +25,8 @@ type Project struct {
 }
 
 type pprojXML struct {
-	InputFiles []struct {
+	ProjectName string `xml:"ProjectName"`
+	InputFiles  []struct {
 		PFiles []string `xml:"PFile"`
 	} `xml:"InputFiles"`
 	IncludeProjects []string `xml:"IncludeProject"`
@@ -44,7 +48,10 @@ func Parse(path string) (*Project, error) {
 	}
 
 	dir := filepath.Dir(path)
-	p := &Project{Path: path}
+	p := &Project{Path: path, Name: strings.TrimSpace(parsed.ProjectName)}
+	if p.Name == "" {
+		p.Name = strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
+	}
 	for _, inputs := range parsed.InputFiles {
 		for _, entry := range inputs.PFiles {
 			p.Files = append(p.Files, expand(resolvePath(dir, entry))...)

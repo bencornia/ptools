@@ -50,9 +50,15 @@ func Hover(workspace []*Document, doc *Document, pos protocol.Position) *protoco
 	}
 }
 
-// signature renders a declaration as P source: the whole declaration when
-// it's short by nature, or its header without a body.
+// signature renders a declaration as P source, as source does, clipped to
+// the hover limits.
 func signature(d declaration) string {
+	return clip(source(d))
+}
+
+// source renders a declaration as P source: the whole declaration when
+// it's short by nature, or its header without a body.
+func source(d declaration) string {
 	decl := d.parent()
 	text := func(n *sitter.Node) string { return n.Utf8Text(d.doc.Text) }
 
@@ -68,10 +74,10 @@ func signature(d declaration) string {
 		// such as int have no node of their own, so use the text.
 		colon, semicolon := firstTokenOfKind(owner, ":"), firstTokenOfKind(owner, ";")
 		if colon == nil || semicolon == nil {
-			return clip(text(owner))
+			return text(owner)
 		}
 		typ := strings.TrimSpace(string(d.doc.Text[colon.EndByte():semicolon.StartByte()]))
-		return clip(fmt.Sprintf("%s %s: %s", keyword, text(d.node), typ))
+		return fmt.Sprintf("%s %s: %s", keyword, text(d.node), typ)
 	case "impl_machine_declaration", "spec_machine_declaration", "scenario_machine_declaration":
 		return header(d.doc, decl, firstChildOfKind(decl, "machine_body"))
 	case "p_function_declaration":
@@ -80,22 +86,22 @@ func signature(d declaration) string {
 		return header(d.doc, decl, firstTokenOfKind(decl, "{"))
 	case "enum_elem", "numbered_enum_elem":
 		// Show the whole enum, so the element's siblings and type are there.
-		return clip(text(decl.Parent().Parent()))
+		return text(decl.Parent().Parent())
 	case "invariant_declaration":
 		if decl.Parent() != nil && decl.Parent().Kind() == "invariant_group_declaration" {
 			// Referenced as <group>_<name>.
-			return clip(d.name + ":" + strings.TrimPrefix(text(decl), "invariant "+text(d.node)+":"))
+			return d.name + ":" + strings.TrimPrefix(text(decl), "invariant "+text(d.node)+":")
 		}
 	}
-	return clip(text(decl))
+	return text(decl)
 }
 
 // header returns a declaration's text up to body, without trailing space.
 func header(doc *Document, decl, body *sitter.Node) string {
 	if body == nil {
-		return clip(decl.Utf8Text(doc.Text))
+		return decl.Utf8Text(doc.Text)
 	}
-	return clip(strings.TrimSpace(string(doc.Text[decl.StartByte():body.StartByte()])))
+	return strings.TrimSpace(string(doc.Text[decl.StartByte():body.StartByte()]))
 }
 
 // firstTokenOfKind is firstChildOfKind for anonymous children, such as "{".
@@ -175,16 +181,25 @@ func declaringStatement(name *sitter.Node) *sitter.Node {
 	return nil
 }
 
-// commentText strips the markers from a // or /* */ comment.
+// commentText strips the markers from a // or /* */ comment, and lines of
+// stars drawing a banner, which would otherwise be AsciiDoc markup.
 func commentText(comment string) string {
 	if rest, ok := strings.CutPrefix(comment, "//"); ok {
-		return strings.TrimSpace(rest)
+		return unbanner(strings.TrimSpace(rest))
 	}
 	comment = strings.TrimSuffix(strings.TrimPrefix(comment, "/*"), "*/")
 	lines := strings.Split(comment, "\n")
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
-		lines[i] = strings.TrimSpace(strings.TrimPrefix(line, "*"))
+		lines[i] = unbanner(strings.TrimSpace(strings.TrimPrefix(line, "*")))
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+// unbanner returns "" for a line of stars.
+func unbanner(line string) string {
+	if strings.Trim(line, "*/") == "" {
+		return ""
+	}
+	return line
 }
