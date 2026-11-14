@@ -35,12 +35,6 @@ go build -o ~/.local/bin/pfmt .
 ```
 
 Building requires cgo (a C compiler), since tree-sitter is a C library.
-While the grammar's repository is private, Go has to fetch it over SSH:
-
-```sh
-go env -w 'GOPRIVATE=github.com/bencornia/*'
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-```
 
 ## Usage
 
