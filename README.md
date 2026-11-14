@@ -107,12 +107,6 @@ go build -o ~/.local/bin/prdb .
 ```
 
 Building requires cgo (a C compiler), since tree-sitter is a C library.
-While the grammar's repository is private, Go has to fetch it over SSH:
-
-```sh
-go env -w 'GOPRIVATE=github.com/bencornia/*'
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-```
 
 `prdb -list trace.json` prints each step of a trace with its source
 location, without an editor. It takes a `.schedule` file too, and
