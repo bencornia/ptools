@@ -501,3 +501,35 @@ func TestLint(t *testing.T) {
 		t.Errorf("-json printed %s", stdout.String())
 	}
 }
+
+func TestHighlight(t *testing.T) {
+	src := "event ePing;\nmachine M {\n  start state S { entry { Ping(); send this, ePing; } }\n  fun Ping() {}\n}\n"
+	var stdout, stderr strings.Builder
+	if status := highlight(nil, strings.NewReader(src), &stdout, &stderr); status != 0 || stderr.Len() > 0 {
+		t.Fatalf("highlight = %d, stderr %q", status, stderr.String())
+	}
+	var tokens []struct {
+		Start, End  int
+		Type        string
+		Declaration bool
+	}
+	if err := json.Unmarshal([]byte(stdout.String()), &tokens); err != nil {
+		t.Fatalf("highlight printed %q: %v", stdout.String(), err)
+	}
+	got := map[string]bool{}
+	for _, tok := range tokens {
+		got[fmt.Sprintf("%s:%s:%v", src[tok.Start:tok.End], tok.Type, tok.Declaration)] = true
+	}
+	for _, want := range []string{
+		"ePing:event:true", "ePing:event:false", "M:class:true", "S:namespace:true",
+		"Ping:function:false", "Ping:function:true", "send:keyword:false",
+	} {
+		if !got[want] {
+			t.Errorf("highlight is missing %s in %s", want, stdout.String())
+		}
+	}
+
+	if status := highlight([]string{"missing.p"}, strings.NewReader(""), &stdout, &stderr); status != 2 {
+		t.Errorf("missing file: highlight = %d, want 2", status)
+	}
+}

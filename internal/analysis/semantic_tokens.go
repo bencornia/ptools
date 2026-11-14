@@ -71,34 +71,66 @@ func SemanticTokens(workspace []*Document, doc *Document, rng *protocol.Range) [
 	}
 
 	e := tokenEncoder{doc: doc}
+	classify(workspace, doc, start, end, e.add)
+	return e.data
+}
+
+// Token is a classified span of a document, in bytes, as Highlight
+// returns it.
+type Token struct {
+	Start       uint   `json:"start"`
+	End         uint   `json:"end"`
+	Type        string `json:"type"`
+	Declaration bool   `json:"declaration,omitempty"`
+}
+
+// Highlight returns doc's tokens in document order, classified as
+// SemanticTokens classifies them, with TokenLegend's names. Unlike
+// SemanticTokens, a token may span lines. Names that don't resolve are left
+// out, as is punctuation.
+func Highlight(workspace []*Document, doc *Document) []Token {
+	tokens := []Token{}
+	classify(workspace, doc, 0, uint(len(doc.Text)), func(n *sitter.Node, token, modifiers int) {
+		tokens = append(tokens, Token{
+			Start:       n.StartByte(),
+			End:         n.EndByte(),
+			Type:        TokenLegend.TokenTypes[token],
+			Declaration: modifiers&modifierDeclaration != 0,
+		})
+	})
+	return tokens
+}
+
+// classify calls emit, in document order, for each token of doc that
+// overlaps the bytes from start to end.
+func classify(workspace []*Document, doc *Document, start, end uint, emit func(n *sitter.Node, token, modifiers int)) {
 	doc.walk(func(n *sitter.Node) bool {
 		if n.EndByte() <= start || n.StartByte() >= end {
 			return false
 		}
 		switch kind := n.Kind(); {
 		case kind == "comment":
-			e.add(n, tokenComment, 0)
+			emit(n, tokenComment, 0)
 		case kind == "string_literal":
-			e.add(n, tokenString, 0)
+			emit(n, tokenString, 0)
 		case kind == "int_literal" || kind == "float_literal":
 			// A float's parts are int_literals and a '.'.
-			e.add(n, tokenNumber, 0)
+			emit(n, tokenNumber, 0)
 		case kind == "identifier":
 			if token, modifiers, ok := identifierToken(workspace, doc, n); ok {
-				e.add(n, token, modifiers)
+				emit(n, token, modifiers)
 			}
 		case n.ChildCount() == 0 && !n.IsNamed() && keywords[kind]:
 			if builtinTypes[kind] && isTypePosition(doc, n) {
-				e.add(n, tokenType, 0)
+				emit(n, tokenType, 0)
 			} else {
-				e.add(n, tokenKeyword, 0)
+				emit(n, tokenKeyword, 0)
 			}
 		default:
 			return true
 		}
 		return false
 	})
-	return e.data
 }
 
 // identifierToken classifies a name by the declaration it refers to.

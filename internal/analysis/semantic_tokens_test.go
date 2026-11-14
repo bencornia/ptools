@@ -88,3 +88,26 @@ func TestSemanticTokensInRange(t *testing.T) {
 		t.Errorf("got %s\nwant %s", strings.Join(got, " "), want)
 	}
 }
+
+func TestHighlight(t *testing.T) {
+	doc := parse(t, tokensMain)
+	got := []string{}
+	for _, tok := range Highlight([]*Document{doc}, doc) {
+		s := fmt.Sprintf("%s:%s", doc.Text[tok.Start:tok.End], tok.Type)
+		if tok.Declaration {
+			s += "+decl"
+		}
+		got = append(got, s)
+	}
+
+	// The same tokens as SemanticTokens, except that a comment spanning
+	// lines stays one token.
+	want := decodeTokens(t, doc, SemanticTokens([]*Document{doc}, doc, nil))
+	if want[0] != "/* Two:comment" || want[1] != "   lines. */:comment" {
+		t.Fatalf("SemanticTokens starts %q", want[:2])
+	}
+	want = append([]string{"/* Two\n   lines. */:comment"}, want[2:]...)
+	if strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("Highlight =\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
+	}
+}

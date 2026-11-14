@@ -3,7 +3,9 @@
 // Run as p-lsp lint [-json] [path ...], it checks P files for lint problems
 // instead: naming, unused declarations, and the other checks .plint.toml
 // configures. Run as p-lsp doc [-o dir] [-private] [path ...], it writes
-// AsciiDoc reference documentation for P projects.
+// AsciiDoc reference documentation for P projects. Run as p-lsp highlight
+// [file], it prints a file's semantic tokens as JSON, for highlighting P
+// outside an editor.
 package main
 
 import (
@@ -23,6 +25,9 @@ const version = "0.1.0"
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "lint" {
 		os.Exit(lint(os.Args[2:], os.Stdout, os.Stderr))
+	}
+	if len(os.Args) > 1 && os.Args[1] == "highlight" {
+		os.Exit(highlight(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
 	}
 	if len(os.Args) > 1 && os.Args[1] == "doc" {
 		os.Exit(docs(os.Args[2:], os.Stdout, os.Stderr))

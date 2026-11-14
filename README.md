@@ -11,14 +11,6 @@ go test ./...
 
 Building requires cgo (a C compiler), since tree-sitter is a C library.
 
-While the grammar's repository is private, Go has to fetch it directly over
-SSH rather than through the public module proxy:
-
-```sh
-go env -w 'GOPRIVATE=github.com/bencornia/*'
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-```
-
 The grammar, [tree-sitter-p](https://github.com/bencornia/tree-sitter-p), is
 an ordinary Go dependency. To work on both at once, use a local checkout
 through a Go workspace, which `.gitignore` keeps out of commits:
@@ -182,6 +174,23 @@ functions too. Asciidoctor turns the pages into HTML:
 p-lsp doc -o docs .
 asciidoctor docs/*.adoc
 ```
+
+## Highlighting outside an editor
+
+`p-lsp highlight` prints the semantic tokens of a P file, or of standard
+input, as the editor gets them, for highlighting P on a web page or anywhere
+else without an editor. Names are classified by what they refer to, so an
+event looks like an event wherever it's used:
+
+```sh
+echo 'event ePing; machine M { start state S { entry { send this, ePing; } } }' | p-lsp highlight
+```
+
+It prints a JSON array of `{"start", "end", "type", "declaration"}` objects in
+document order, with byte offsets and the type names of the server's
+semantic token legend (`event`, `class`, `namespace`, `function`,
+`keyword`, ...). Punctuation, and names that don't resolve, are left out. A
+file's names resolve across its project; standard input's within itself.
 
 ## Editor setup
 
