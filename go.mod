@@ -3,7 +3,7 @@ module github.com/bencornia/prdb
 go 1.24.3
 
 require (
-	github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a
+	github.com/bencornia/tree-sitter-p v0.0.0-20261114184935-6057d17685c6
 	github.com/google/go-dap v0.12.0
 	github.com/tree-sitter/go-tree-sitter v0.25.0
 )

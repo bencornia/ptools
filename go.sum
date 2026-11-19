@@ -1,5 +1,5 @@
-github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a h1:FeFLGhbFp5Ms1H2JbM2sZjYPPiz73S0lephjJyLWS+o=
-github.com/bencornia/tree-sitter-p v0.0.0-20261027205321-899bd465462a/go.mod h1:EUT4ZH1JlTxM2a7G6u6C02u4JZDNdLDu/SwTLLQlU7g=
+github.com/bencornia/tree-sitter-p v0.0.0-20261114184935-6057d17685c6 h1:wxHlmBK2LWYCEINEguR8ReflGQKg3cmNR2vAbUKxdxQ=
+github.com/bencornia/tree-sitter-p v0.0.0-20261114184935-6057d17685c6/go.mod h1:XZFKog/Kb+VswQnJ1gUESA9TW5ipdpTIIYnEpDcADyA=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-dap v0.12.0 h1:rVcjv3SyMIrpaOoTAdFDyHs99CwVOItIJGKLQFQhNeM=
