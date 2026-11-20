@@ -16,8 +16,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bencornia/pfmt/diff"
-	"github.com/bencornia/pfmt/format"
+	"github.com/bencornia/ptools/internal/diff"
+	"github.com/bencornia/ptools/internal/format"
 )
 
 func main() {

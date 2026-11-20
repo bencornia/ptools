@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bencornia/prdb/internal/session"
+	"github.com/bencornia/ptools/internal/session"
 )
 
 func open(t *testing.T) *session.Session {

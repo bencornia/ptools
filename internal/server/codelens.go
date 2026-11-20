@@ -3,7 +3,7 @@ package server
 import (
 	"path/filepath"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/bencornia/ptools/internal/analysis"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )

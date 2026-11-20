@@ -12,9 +12,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
-	"github.com/bencornia/p-lsp/internal/project"
-	"github.com/bencornia/p-lsp/internal/style"
+	"github.com/bencornia/ptools/internal/analysis"
+	"github.com/bencornia/ptools/internal/project"
+	"github.com/bencornia/ptools/internal/style"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )

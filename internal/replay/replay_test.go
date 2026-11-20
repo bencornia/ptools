@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bencornia/prdb/internal/trace"
+	"github.com/bencornia/ptools/internal/trace"
 )
 
 func TestSchedule(t *testing.T) {

@@ -7,7 +7,7 @@ import (
 	"io"
 	"path/filepath"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/bencornia/ptools/internal/analysis"
 )
 
 // highlight prints the tokens of a P file, or of standard input with no

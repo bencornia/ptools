@@ -18,9 +18,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/bencornia/prdb/internal/session"
-	"github.com/bencornia/prdb/internal/source"
-	"github.com/bencornia/prdb/internal/trace"
+	"github.com/bencornia/ptools/internal/session"
+	"github.com/bencornia/ptools/internal/source"
+	"github.com/bencornia/ptools/internal/trace"
 	godap "github.com/google/go-dap"
 )
 

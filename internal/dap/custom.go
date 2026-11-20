@@ -5,7 +5,7 @@ import (
 
 	godap "github.com/google/go-dap"
 
-	"github.com/bencornia/prdb/internal/diagram"
+	"github.com/bencornia/ptools/internal/diagram"
 )
 
 // prdb's own requests, beyond the protocol's, for a client that shows the

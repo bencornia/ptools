@@ -6,8 +6,8 @@ import (
 	"slices"
 	"time"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
-	"github.com/bencornia/p-lsp/internal/compile"
+	"github.com/bencornia/ptools/internal/analysis"
+	"github.com/bencornia/ptools/internal/compile"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )

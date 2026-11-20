@@ -15,7 +15,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/bencornia/ptools/internal/analysis"
 )
 
 // Project is a project to document.

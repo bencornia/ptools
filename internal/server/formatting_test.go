@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bencornia/pfmt/format"
+	"github.com/bencornia/ptools/internal/format"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 

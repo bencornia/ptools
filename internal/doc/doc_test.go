@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
+	"github.com/bencornia/ptools/internal/analysis"
 )
 
 const timerSource = `// A timeout from a timer.

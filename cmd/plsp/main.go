@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bencornia/p-lsp/internal/server"
+	"github.com/bencornia/ptools/internal/server"
 	"github.com/tliron/commonlog"
 	_ "github.com/tliron/commonlog/simple"
 )

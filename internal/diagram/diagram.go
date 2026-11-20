@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bencornia/prdb/internal/session"
-	"github.com/bencornia/prdb/internal/trace"
+	"github.com/bencornia/ptools/internal/session"
+	"github.com/bencornia/ptools/internal/trace"
 )
 
 // Options choose what to draw.

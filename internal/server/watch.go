@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/bencornia/p-lsp/internal/project"
-	"github.com/bencornia/p-lsp/internal/style"
+	"github.com/bencornia/ptools/internal/project"
+	"github.com/bencornia/ptools/internal/style"
 	"github.com/tliron/glsp"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )

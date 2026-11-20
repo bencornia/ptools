@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/bencornia/prdb/internal/replay"
-	"github.com/bencornia/prdb/internal/source"
-	"github.com/bencornia/prdb/internal/trace"
+	"github.com/bencornia/ptools/internal/replay"
+	"github.com/bencornia/ptools/internal/source"
+	"github.com/bencornia/ptools/internal/trace"
 )
 
 // Session is a trace being stepped through.

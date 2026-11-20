@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bencornia/p-lsp/internal/style"
+	"github.com/bencornia/ptools/internal/style"
 )
 
 // namingSource declares every kind of name, all in the default style.

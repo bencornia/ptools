@@ -10,9 +10,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bencornia/p-lsp/internal/analysis"
-	"github.com/bencornia/p-lsp/internal/doc"
-	"github.com/bencornia/p-lsp/internal/project"
+	"github.com/bencornia/ptools/internal/analysis"
+	"github.com/bencornia/ptools/internal/doc"
+	"github.com/bencornia/ptools/internal/project"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 

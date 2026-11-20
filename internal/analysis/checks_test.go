@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bencornia/p-lsp/internal/style"
+	"github.com/bencornia/ptools/internal/style"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 

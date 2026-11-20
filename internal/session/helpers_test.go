@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/bencornia/prdb/internal/source"
-	"github.com/bencornia/prdb/internal/trace"
+	"github.com/bencornia/ptools/internal/source"
+	"github.com/bencornia/ptools/internal/trace"
 )
 
 // A project whose machine sends through a top-level helper from an

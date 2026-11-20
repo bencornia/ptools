@@ -15,9 +15,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bencornia/prdb/internal/dap"
-	"github.com/bencornia/prdb/internal/diagram"
-	"github.com/bencornia/prdb/internal/session"
+	"github.com/bencornia/ptools/internal/dap"
+	"github.com/bencornia/ptools/internal/diagram"
+	"github.com/bencornia/ptools/internal/session"
 )
 
 const version = "0.1.0"
