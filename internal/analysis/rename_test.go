@@ -11,6 +11,7 @@ import (
 const renameTypes = `type tReq = (source: machine, amount: int);
 event eReq : tReq;
 fun Helper(): int { return 1; }
+fun AsReq(): any { return (source = null, amount = 2) as tReq; }
 `
 
 const renameMain = `machine Client {
@@ -113,7 +114,12 @@ func TestRename(t *testing.T) {
 		{
 			name: "tuple field, including a tuple value's field", cursor: "amount = count", newName: "total",
 			wantMain:  strings.ReplaceAll(renameMain, "amount = count", "total = count"),
-			wantTypes: strings.ReplaceAll(renameTypes, "amount: int", "total: int"),
+			wantTypes: strings.NewReplacer("amount: int", "total: int", "amount = 2", "total = 2").Replace(renameTypes),
+		},
+		{
+			name: "tuple field, from a tuple value cast to its type", cursor: "amount = 2", inTypes: true, newName: "total",
+			wantMain:  strings.ReplaceAll(renameMain, "amount = count", "total = count"),
+			wantTypes: strings.NewReplacer("amount: int", "total: int", "amount = 2", "total = 2").Replace(renameTypes),
 		},
 		{
 			name: "invariant in a Lemma, from its declaration", cursor: "waiting:", newName: "ready",

@@ -135,6 +135,12 @@ func expectedType(workspace []*Document, doc *Document, value *sitter.Node) (typ
 		return tupleTypeElement(workspace, outer, indexOf(context, node))
 	case "paren_expression":
 		return expectedType(workspace, doc, context)
+	case "cast_expression":
+		// `(source = this, amount = 1) as tReq`: the value is read as the
+		// type it's cast to.
+		if sameNode(context.NamedChild(0), node) {
+			return typeRef{doc, context.NamedChild(context.NamedChildCount() - 1)}, true
+		}
 	case "insert_statement":
 		// `c += (key, value)`: a map's key and value, or a sequence's index
 		// and element.

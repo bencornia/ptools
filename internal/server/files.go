@@ -18,7 +18,25 @@ func uriToPath(uri string) string {
 	if err != nil || u.Scheme != "file" {
 		return uri
 	}
-	return filepath.Clean(filepath.FromSlash(u.Path))
+	path := u.Path
+	switch {
+	case u.Opaque != "":
+		// file:relative/path
+		path = u.Opaque
+	case u.Host == "." || u.Host == "..":
+		// file://. or file://../dir, a relative path whose first
+		// element parses as the host.
+		path = u.Host + u.Path
+	}
+	path = filepath.FromSlash(path)
+	// Relative paths would key the same file two ways: as found under a
+	// relative workspace root, and as listed by its absolute .pproj.
+	if !filepath.IsAbs(path) {
+		if abs, err := filepath.Abs(path); err == nil {
+			return abs
+		}
+	}
+	return filepath.Clean(path)
 }
 
 func pathToURI(path string) string {
