@@ -145,7 +145,7 @@ func TestOpenFileShowsSyntaxAndTypeErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := collect(t, published, root, 1)["App/PSrc/Main.p"]
-	if len(got) != 2 || !strings.Contains(got[0], "p-lsp:") || !strings.Contains(got[1], "p compile: could not find event") {
+	if len(got) != 2 || !strings.Contains(got[0], "plsp:") || !strings.Contains(got[1], "p compile: could not find event") {
 		t.Errorf("got %v, want a syntax error then the type error", got)
 	}
 
@@ -173,7 +173,7 @@ func TestFilesInNoProjectAreNotTypeChecked(t *testing.T) {
 
 func TestMissingCompilerTurnsTypeCheckingOff(t *testing.T) {
 	s, _ := start(t, nil, client{})
-	s.SetCompiler([]string{"p-lsp-no-such-compiler"}, time.Second)
+	s.SetCompiler([]string{"plsp-no-such-compiler"}, time.Second)
 	if s.compiler != nil {
 		t.Error("type checking is on without a compiler")
 	}
@@ -199,7 +199,7 @@ func TestCompilerErrorsFoundWhileEditingAreNotRepeated(t *testing.T) {
 	collect(t, published, root, 1)
 	save(t, s, ctx, main)
 	got := collect(t, published, root, 1)["App/PSrc/Main.p"]
-	if len(got) != 1 || !strings.Contains(got[0], "p-lsp: undefined event `eFoo`") {
+	if len(got) != 1 || !strings.Contains(got[0], "plsp: undefined event `eFoo`") {
 		t.Errorf("got %v, want only the server's own report", got)
 	}
 

@@ -22,13 +22,13 @@ import (
 // directory; without, the one project's page, printed. It returns the exit
 // status: 0, or 2 if something went wrong.
 func docs(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("p-lsp doc", flag.ContinueOnError)
+	flags := flag.NewFlagSet("plsp doc", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	out := flags.String("o", "", "write a page for each project, and index.adoc, to `dir`")
 	private := flags.Bool("private", false, "document machines' variables and functions too")
 	title := flags.String("title", "P projects", "the index page's title")
 	flags.Usage = func() {
-		fmt.Fprintf(stderr, "usage: p-lsp doc [-o dir] [-private] [-title title] [path ...]\n\n"+
+		fmt.Fprintf(stderr, "usage: plsp doc [-o dir] [-private] [-title title] [path ...]\n\n"+
 			"Writes AsciiDoc reference documentation for the P projects (.pproj files)\n"+
 			"among the paths and under the directories among them, the current one by\n"+
 			"default. A project's page opens with the README.adoc beside its .pproj, if\n"+

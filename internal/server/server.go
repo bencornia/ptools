@@ -17,7 +17,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-const name = "p-lsp"
+const name = "plsp"
 
 var log = commonlog.GetLogger(name)
 

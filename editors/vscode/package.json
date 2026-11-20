@@ -1,12 +1,12 @@
 {
-  "name": "p-lsp",
+  "name": "ptools",
   "displayName": "P",
-  "description": "P language support: the p-lsp language server, pfmt formatting, and the prdb replay debugger",
-  "version": "0.5.1",
+  "description": "P language support: the plsp language server, pfmt formatting, and the prdb replay debugger",
+  "version": "0.6.0",
   "publisher": "bencornia",
   "repository": {
     "type": "git",
-    "url": "https://github.com/bencornia/p-lsp"
+    "url": "https://github.com/bencornia/ptools"
   },
   "engines": {
     "vscode": "^1.91.0"
@@ -37,18 +37,18 @@
     "configuration": {
       "title": "P",
       "properties": {
-        "p-lsp.path": {
+        "plsp.path": {
           "type": "string",
-          "default": "p-lsp",
-          "description": "The p-lsp binary to run."
+          "default": "plsp",
+          "description": "The plsp binary to run."
         },
-        "p-lsp.args": {
+        "plsp.args": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "description": "Arguments to pass to p-lsp, such as [\"-compiler\", \"\"] to turn off type checking."
+          "description": "Arguments to pass to plsp, such as [\"-compiler\", \"\"] to turn off type checking."
         },
         "prdb.path": {
           "type": "string",
@@ -87,7 +87,7 @@
     ],
     "commands": [
       {
-        "command": "p-lsp.lintWorkspace",
+        "command": "plsp.lintWorkspace",
         "title": "Lint Workspace",
         "category": "P"
       },

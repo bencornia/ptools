@@ -25,11 +25,11 @@ import (
 // diagnostics. It returns the exit status: 0 for none, 1 for problems, 2 if
 // something couldn't be checked.
 func lint(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("p-lsp lint", flag.ContinueOnError)
+	flags := flag.NewFlagSet("plsp lint", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	asJSON := flags.Bool("json", false, "print the problems as a JSON array of LSP diagnostics, each with its file")
 	flags.Usage = func() {
-		fmt.Fprintf(stderr, "usage: p-lsp lint [-json] [path ...]\n\n"+
+		fmt.Fprintf(stderr, "usage: plsp lint [-json] [path ...]\n\n"+
 			"Checks P files for names that don't follow the naming style, unused\n"+
 			"declarations, events that are never sent, unreachable states and code, and\n"+
 			"shadowed machine variables, as configured by the nearest %s above each\n"+

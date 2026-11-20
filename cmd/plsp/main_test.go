@@ -280,7 +280,7 @@ func TestProtocol(t *testing.T) {
 			t.Errorf("capability %s = %s, want it to contain %s", capability, got, want)
 		}
 	}
-	if init.ServerInfo.Name != "p-lsp" {
+	if init.ServerInfo.Name != "plsp" {
 		t.Errorf("server name %q", init.ServerInfo.Name)
 	}
 

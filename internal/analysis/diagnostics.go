@@ -8,7 +8,7 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-const diagnosticSource = "p-lsp"
+const diagnosticSource = "plsp"
 
 // SyntaxDiagnostics reports the ERROR and MISSING nodes tree-sitter produced
 // while recovering from syntax errors.

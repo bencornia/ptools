@@ -30,11 +30,7 @@ formatting would change anything but whitespace, it reports an error instead.
 
 ## Installing
 
-```sh
-go build -o ~/.local/bin/pfmt .
-```
-
-Building requires cgo (a C compiler), since tree-sitter is a C library.
+Build and install it as the [top-level README](../../README.md) says.
 
 ## Usage
 
@@ -69,7 +65,7 @@ For another width, change `unit` and pass it to pfmt too, as in
 
 ## Neovim and VS Code
 
-[p-lsp](https://github.com/bencornia/p-lsp) formats with pfmt, so with p-lsp
+[plsp](../plsp) formats with pfmt, so with plsp
 set up, the editor's own formatting commands work, using the editor's tab
 size as the indent width.
 
@@ -82,7 +78,7 @@ vim.api.nvim_create_autocmd('BufWritePre', {
 })
 ```
 
-Without p-lsp, `gq` can run pfmt directly:
+Without plsp, `gq` can run pfmt directly:
 
 ```lua
 vim.api.nvim_create_autocmd('FileType', {
@@ -104,8 +100,8 @@ In VS Code, use Format Document, or format on save with this in
 ## Developing
 
 ```sh
-go test ./...
-PFMT_CORPUS=path/to/P go test ./format -run Corpus   # format a whole repo of P code
+go test ./internal/format ./internal/diff
+PFMT_CORPUS=path/to/P go test ./internal/format -run Corpus   # format a whole repo of P code
 ```
 
 The corpus test checks that every file formats, and that formatting again
@@ -119,5 +115,5 @@ changes nothing. All of github.com/p-org/P passes.
 - [x] `pfmt` command: stdin, files and directories, `-w`, `-l`, `-indent`
 - [x] Tests, and a corpus test over the P repo
 - [x] `-d` to print diffs instead of formatted files
-- [x] `textDocument/formatting` in p-lsp, using the `format` package
+- [x] `textDocument/formatting` in plsp, using the `format` package
 - [x] Editor setup for Neovim and VS Code

@@ -82,7 +82,7 @@ full. In a long diagram, the machines' names are repeated every 36 steps.
 prdb -diagram -o bug.svg PCheckerOutput/BugFinding/MyProject_0_0.trace.json
 ```
 
-![The planted bug in testdata/pingpong: the server counts the third ping twice, and the client's assertion fails](docs/pingpong.svg)
+![The planted bug in testdata/pingpong: the server counts the third ping twice, and the client's assertion fails](pingpong.svg)
 
 Like `-list`, it takes a trace, a `.schedule` file or `-testcase`, and
 `-schedule`. For a big trace, draw part of it:
@@ -102,11 +102,7 @@ goto, print or receive.
 
 ## Installing
 
-```sh
-go build -o ~/.local/bin/prdb .
-```
-
-Building requires cgo (a C compiler), since tree-sitter is a C library.
+Build and install it as the [top-level README](../../README.md) says.
 
 `prdb -list trace.json` prints each step of a trace with its source
 location, without an editor. It takes a `.schedule` file too, and
@@ -115,16 +111,9 @@ case. `-schedule n` picks a schedule of a `--verbose` trace.
 
 ## VS Code
 
-The debugger is part of the P extension, in p-lsp's
-[`editors/vscode`](https://github.com/bencornia/p-lsp/tree/main/editors/vscode).
-Install prdb, then build and install the extension:
-
-```sh
-cd p-lsp/editors/vscode
-npm install
-npx @vscode/vsce package --skip-license
-code --install-extension p-lsp-0.2.0.vsix
-```
+The debugger is part of the P extension, in
+[`editors/vscode`](../../editors/vscode). Install prdb and the extension as
+the [top-level README](../../README.md#vs-code) says.
 
 Open a `.p` file and start debugging (F5, or Run and Debug): with no
 `launch.json`, it asks what to debug: one of the workspace's traces and
@@ -184,7 +173,7 @@ too. A test case's project is found from Neovim's current directory, so
 start it in the project, or add `project` to the configuration. nvim-dap
 maps no keys itself; stepping back is `dap.step_back()`, and reverse
 continue `dap.reverse_continue()`. For Neovim to know `.p` files as P, see
-p-lsp's README.
+plsp's README.
 
 Helix's debugger support is experimental, and has no step back. prdb works
 around its not selecting the thread at the first stop, so with a
@@ -220,7 +209,7 @@ for it a `g` with class `step`, both with a `data-step` attribute.
 ## Developing
 
 ```sh
-go test ./...
+go test ./internal/dap ./internal/diagram ./internal/replay ./internal/session ./internal/source ./internal/trace
 ```
 
 `testdata/pingpong` is a small P project with a planted bug, and the trace
@@ -232,7 +221,7 @@ PChecker wrote for it.
 - [x] Map each step to its handler or statement, through helper functions and included projects
 - [x] Debug adapter: a thread per machine, stepping both ways, breakpoints, payloads and inboxes, stopping at the failed assertion
 - [x] `prdb -list`
-- [x] VS Code: the debugger in p-lsp's VS Code extension, with a trace picker
+- [x] VS Code: the debugger in plsp's VS Code extension, with a trace picker
 - [x] Launch from a `.schedule` file, replaying it with `p check --replay -v`
 - [x] Launch a test case: run `p check` to find a bug, then replay it
 - [x] Choose which schedule of a `--verbose` trace with several to replay

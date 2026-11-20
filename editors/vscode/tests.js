@@ -1,4 +1,4 @@
-// Runs and debugs the test cases p-lsp puts lenses over. Run test compiles
+// Runs and debugs the test cases plsp puts lenses over. Run test compiles
 // the project and checks the test case with p check in a terminal; if
 // PChecker finds a bug, it offers to step through the bug's trace with
 // prdb. Debug test has prdb check the test case itself, until PChecker

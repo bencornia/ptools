@@ -17,10 +17,10 @@ import (
 // byte offsets. Names that don't resolve, and punctuation, are left out.
 // It returns the exit status: 0, or 2 if the input couldn't be read.
 func highlight(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("p-lsp highlight", flag.ContinueOnError)
+	flags := flag.NewFlagSet("plsp highlight", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.Usage = func() {
-		fmt.Fprintf(stderr, "usage: p-lsp highlight [file]\n\n"+
+		fmt.Fprintf(stderr, "usage: plsp highlight [file]\n\n"+
 			"Prints the tokens of a P file, or of standard input, as a JSON array of\n"+
 			"{\"start\", \"end\", \"type\", \"declaration\"} objects with byte offsets,\n"+
 			"classified as the editor classifies them. A file's names resolve across\n"+

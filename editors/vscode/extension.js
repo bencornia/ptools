@@ -1,4 +1,4 @@
-// Starts p-lsp for P files, runs the test cases it puts lenses over, and
+// Starts plsp for P files, runs the test cases it puts lenses over, and
 // runs prdb to replay PChecker traces, or to debug the bug PChecker finds
 // in a test case.
 const path = require('path');
@@ -24,9 +24,9 @@ async function activate(context) {
     registerLint(context);
     registerTests(context, projectOf);
 
-    const config = vscode.workspace.getConfiguration('p-lsp');
+    const config = vscode.workspace.getConfiguration('plsp');
     client = new LanguageClient(
-        'p-lsp',
+        'plsp',
         'P',
         { command: config.get('path'), args: config.get('args') },
         { documentSelector: [{ scheme: 'file', language: 'p' }] },

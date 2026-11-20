@@ -151,7 +151,7 @@ echo "$@" >> `+record+`
 }
 
 func TestAvailable(t *testing.T) {
-	if err := (&Runner{Command: []string{"p-lsp-no-such-compiler"}}).Available(); err == nil {
+	if err := (&Runner{Command: []string{"plsp-no-such-compiler"}}).Available(); err == nil {
 		t.Error("missing compiler reported as available")
 	}
 	if err := (&Runner{Command: []string{"sh"}}).Available(); err != nil {
@@ -212,7 +212,7 @@ echo "Type checking ..."
 			t.Errorf("%s exists: %v, want %v", name, err == nil, want)
 		}
 	}
-	// A directory there before p-lsp first compiled is kept, even if it's
+	// A directory there before plsp first compiled is kept, even if it's
 	// empty after a later check.
 	os.Mkdir(filepath.Join(dir, "PGenerated"), 0o755)
 	r2, _ := fakeCompiler(t, "echo")

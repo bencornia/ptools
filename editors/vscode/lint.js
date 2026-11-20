@@ -1,5 +1,5 @@
-// Lints every P file in the workspace with p-lsp lint, for the Problems
-// panel. p-lsp checks the files open in the editor itself, so
+// Lints every P file in the workspace with plsp lint, for the Problems
+// panel. plsp checks the files open in the editor itself, so
 // only the rest are shown from here: when a file opens, the server takes
 // over its warnings, and when it closes, they come back here.
 const cp = require('child_process');
@@ -11,10 +11,10 @@ let collection;
 let checked = false;
 
 function registerLint(context) {
-    collection = vscode.languages.createDiagnosticCollection('p-lsp lint');
+    collection = vscode.languages.createDiagnosticCollection('plsp lint');
     context.subscriptions.push(
         collection,
-        vscode.commands.registerCommand('p-lsp.lintWorkspace', lintWorkspace),
+        vscode.commands.registerCommand('plsp.lintWorkspace', lintWorkspace),
         vscode.workspace.onDidOpenTextDocument((doc) => collection.delete(doc.uri)),
         vscode.workspace.onDidCloseTextDocument((doc) => {
             if (checked && doc.uri.scheme === 'file' && doc.languageId === 'p') {
@@ -38,7 +38,7 @@ async function lintWorkspace() {
             () => lint(folders),
         );
     } catch (e) {
-        vscode.window.showErrorMessage(`p-lsp lint failed: ${e.message}`);
+        vscode.window.showErrorMessage(`plsp lint failed: ${e.message}`);
         return;
     }
     checked = true;
@@ -63,10 +63,10 @@ function show(problems) {
     }
 }
 
-// lint runs p-lsp lint on paths, and returns the diagnostics of each file
+// lint runs plsp lint on paths, and returns the diagnostics of each file
 // it checked, by path; files with no problems have none.
 function lint(paths) {
-    const config = vscode.workspace.getConfiguration('p-lsp');
+    const config = vscode.workspace.getConfiguration('plsp');
     return new Promise((resolve, reject) => {
         cp.execFile(config.get('path'), ['lint', '-json', ...paths], { maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
             // 1 means it found problems.
@@ -91,7 +91,7 @@ function lint(paths) {
     });
 }
 
-// toDiagnostic converts a problem p-lsp lint -json printed, an LSP
+// toDiagnostic converts a problem plsp lint -json printed, an LSP
 // diagnostic with its file, to a VS Code one.
 function toDiagnostic(p) {
     const position = (pos) => new vscode.Position(pos.line, pos.character);

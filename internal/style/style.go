@@ -1,4 +1,4 @@
-// Package style holds the naming conventions p-lsp checks P names against,
+// Package style holds the naming conventions plsp checks P names against,
 // and which of its other checks are on, and reads them from a project's
 // .plint.toml.
 package style

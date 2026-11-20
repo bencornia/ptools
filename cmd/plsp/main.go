@@ -1,9 +1,9 @@
-// Command p-lsp is a language server for the P programming language.
+// Command plsp is a language server for the P programming language.
 //
-// Run as p-lsp lint [-json] [path ...], it checks P files for lint problems
+// Run as plsp lint [-json] [path ...], it checks P files for lint problems
 // instead: naming, unused declarations, and the other checks .plint.toml
-// configures. Run as p-lsp doc [-o dir] [-private] [path ...], it writes
-// AsciiDoc reference documentation for P projects. Run as p-lsp highlight
+// configures. Run as plsp doc [-o dir] [-private] [path ...], it writes
+// AsciiDoc reference documentation for P projects. Run as plsp highlight
 // [file], it prints a file's semantic tokens as JSON, for highlighting P
 // outside an editor.
 package main

@@ -36,9 +36,9 @@ type Runner struct {
 	mu sync.Mutex
 	// running cancels the check in progress for each project.
 	running map[string]context.CancelFunc
-	// env is the environment to run the compiler in, or nil for p-lsp's.
+	// env is the environment to run the compiler in, or nil for plsp's.
 	env []string
-	// before holds the names in each project's directory before p-lsp
+	// before holds the names in each project's directory before plsp
 	// first compiled it.
 	before map[string]map[string]bool
 }
@@ -108,7 +108,7 @@ func (r *Runner) Check(pproj string, files []string) ([]Error, error) {
 	}()
 
 	// Keep generated code out of the user's project.
-	outDir, err := os.MkdirTemp("", "p-lsp-compile-")
+	outDir, err := os.MkdirTemp("", "plsp-compile-")
 	if err != nil {
 		return nil, err
 	}

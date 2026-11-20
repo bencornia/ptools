@@ -1,37 +1,12 @@
-# P LSP
+# plsp
 
-An lsp written for the [P programming language](https://github.com/p-org/P).
-
-## Building
-
-```sh
-go build -o bin/p-lsp .
-go test ./...
-```
-
-Building requires cgo (a C compiler), since tree-sitter is a C library.
-
-The grammar, [tree-sitter-p](https://github.com/bencornia/tree-sitter-p), is
-an ordinary Go dependency. To work on both at once, use a local checkout
-through a Go workspace, which `.gitignore` keeps out of commits:
-
-```sh
-git clone https://github.com/bencornia/tree-sitter-p ../tree-sitter-p
-go work init . ../tree-sitter-p
-```
-
-After regenerating the grammar, rebuild with `go build -a`. The Go binding
-`#include`s `parser.c` from outside its package, so a plain `go build` can
-reuse a stale cached parser.
+A language server for the [P programming language](https://github.com/p-org/P).
+Build and install it as the [top-level README](../../README.md) says.
 
 ## Running
 
 The server speaks LSP over stdin/stdout. The editor setups below expect
-`p-lsp` on your `PATH`, so build it there, for example:
-
-```sh
-go build -o ~/.local/bin/p-lsp .
-```
+`plsp` on your `PATH`.
 
 Logs go to stderr; pass `-v 2` for more of them.
 
@@ -44,7 +19,7 @@ to a temporary directory, not your project.
 
 `p` is a .NET tool. An editor started from a desktop menu often doesn't
 have the `PATH` your shell profile sets, so if `p` isn't on the `PATH`,
-p-lsp looks where `dotnet tool install --global P` puts it,
+plsp looks where `dotnet tool install --global P` puts it,
 `~/.dotnet/tools/p`, and runs it with `DOTNET_ROOT` set to `~/.dotnet` if
 .NET is there. If yours is somewhere else, the environment your editor
 starts the server in needs it:
@@ -59,7 +34,7 @@ reports several at once. Both versions' output formats are understood.
 
 ## Naming style
 
-p-lsp warns about declared names that don't follow a naming style, and
+plsp warns about declared names that don't follow a naming style, and
 offers to rename each one, along with everything that refers to it, unless
 the new name would clash with another. The default style:
 
@@ -99,7 +74,7 @@ or `off` to not check that kind of name.
 
 ## Lint checks
 
-Besides naming, p-lsp warns about:
+Besides naming, plsp warns about:
 
 | Check | Setting | What it finds |
 |---|---|---|
@@ -131,19 +106,19 @@ shadowing = "off"
 order = "warning"
 ```
 
-To check from the command line, as in CI, run `p-lsp lint`. It checks the P
+To check from the command line, as in CI, run `plsp lint`. It checks the P
 files under each path given (the current directory by default) against the
 files compiled with them, prints each problem as
 `file:line:column: message (check)`, and exits with 1 if it found any.
 `-json` prints them as LSP diagnostics instead, each with its `file`:
 
 ```sh
-p-lsp lint ./...
+plsp lint ./...
 ```
 
 ## Documentation
 
-`p-lsp doc` writes reference documentation for P projects as AsciiDoc,
+`plsp doc` writes reference documentation for P projects as AsciiDoc,
 organized like Go's package documentation. Each project (`.pproj`) gets a
 page:
 
@@ -171,19 +146,19 @@ page of the one project found. `-private` documents machines' variables and
 functions too. Asciidoctor turns the pages into HTML:
 
 ```sh
-p-lsp doc -o docs .
+plsp doc -o docs .
 asciidoctor docs/*.adoc
 ```
 
 ## Highlighting outside an editor
 
-`p-lsp highlight` prints the semantic tokens of a P file, or of standard
+`plsp highlight` prints the semantic tokens of a P file, or of standard
 input, as the editor gets them, for highlighting P on a web page or anywhere
 else without an editor. Names are classified by what they refer to, so an
 event looks like an event wherever it's used:
 
 ```sh
-echo 'event ePing; machine M { start state S { entry { send this, ePing; } } }' | p-lsp highlight
+echo 'event ePing; machine M { start state S { entry { send this, ePing; } } }' | plsp highlight
 ```
 
 It prints a JSON array of `{"start", "end", "type", "declaration"}` objects in
@@ -208,8 +183,8 @@ grammar. Add this to `~/.config/helix/languages.toml`:
 # grammars are already built.
 use-grammars = { only = ["p"] }
 
-[language-server.p-lsp]
-command = "p-lsp"
+[language-server.plsp]
+command = "plsp"
 
 [[language]]
 name = "p"
@@ -218,7 +193,7 @@ file-types = ["p"]
 comment-token = "//"
 block-comment-tokens = { start = "/*", end = "*/" }
 indent = { tab-width = 4, unit = "    " }
-language-servers = ["p-lsp"]
+language-servers = ["plsp"]
 # Format with pfmt, through the server, on save.
 auto-format = true
 
@@ -252,7 +227,7 @@ server's semantic tokens do the highlighting.
 vim.filetype.add({ extension = { p = 'p' } })
 
 vim.lsp.config('p_lsp', {
-  cmd = { 'p-lsp' },
+  cmd = { 'plsp' },
   filetypes = { 'p' },
   root_markers = { '.git' },
 })
@@ -276,24 +251,18 @@ vim.api.nvim_create_autocmd('BufWritePre', {
 
 ### VS Code
 
-VS Code needs an extension to start a language server; a minimal one is in
-`editors/vscode`. Package and install it:
+VS Code needs an extension to start a language server. The P extension in
+[`editors/vscode`](../../editors/vscode) starts plsp; install it as the
+[top-level README](../../README.md#vs-code) says.
 
-```sh
-cd editors/vscode
-npm install
-npx @vscode/vsce package --skip-license
-code --install-extension p-lsp-0.5.1.vsix
-```
-
-It highlights with the server's semantic tokens. Set `p-lsp.path` if
-`p-lsp` isn't on the `PATH` VS Code sees, and `p-lsp.args` to pass flags
+It highlights with the server's semantic tokens. Set `plsp.path` if
+`plsp` isn't on the `PATH` VS Code sees, and `plsp.args` to pass flags
 such as `["-compiler", ""]`. Format Document formats with pfmt; to format
 on save, add `"[p]": { "editor.formatOnSave": true }` to `settings.json`.
 
 Lint warnings show in the files you have open, as in any editor. To see
 them for every P file in the workspace, run **P: Lint Workspace** from the
-Command Palette: it runs `p-lsp lint` and puts what it finds in the
+Command Palette: it runs `plsp lint` and puts what it finds in the
 Problems panel.
 
 Above each test case, **Run test** compiles the project and checks the test
@@ -306,7 +275,7 @@ the command that runs the P tool, if it isn't `p` on the `PATH` or in
 `p.debugTest` commands for the editor to run, so other editors show them
 but need their own handlers to run them.
 
-The extension also runs [prdb](https://github.com/bencornia/prdb), a replay
+The extension also runs [prdb](../prdb), a replay
 debugger for PChecker's traces: with prdb on the `PATH` (or `prdb.path`
 set), start debugging in a `.p` file and pick a trace to step through.
 While debugging, the toolbar's Show Trace Diagram button opens the trace's
@@ -342,11 +311,11 @@ there.
 - [x] Quick fix: declare an undefined event, with its payload type taken from how it's handled or sent
 - [x] Quick fix: change a misspelled name to the closest name in scope (variables, functions, types, states, modules, fields, events)
 - [x] Signature help: a function's parameters, a machine's start parameter after `new`, or an event's payload type in `send`, `raise` and `announce`, while typing arguments
-- [x] Formatting with [pfmt](https://github.com/bencornia/pfmt), indenting by the editor's tab size
+- [x] Formatting with [pfmt](../pfmt), indenting by the editor's tab size
 - [x] Merge the full-tree passes behind diagnostics (tuple checks, undefined events and names, empty receives) into one walk, to speed up large files
 - [x] Tests for `internal/server`, and an end-to-end test of the binary over stdio
 - [x] Editor setup instructions (Helix, Neovim, VS Code)
-- [x] Naming style warnings, configurable with `.plint.toml`, with a quick fix that renames the declaration everywhere, and `p-lsp lint` for the command line
+- [x] Naming style warnings, configurable with `.plint.toml`, with a quick fix that renames the declaration everywhere, and `plsp lint` for the command line
 - [x] Lint checks: unused declarations, events never sent, unreachable states and code, and shadowed machine variables
 - [x] Run test and Debug test lenses over each test case, run in VS Code with `p check` and prdb
 
@@ -361,7 +330,7 @@ there.
 - [x] Add `scenario` declarations
 - [x] Fix `rhs` field on comparison and `in` expressions
 - [x] Start a `test/corpus`
-- [x] Remove `.git` from the Go module path, so p-lsp can depend on it without a `replace`
+- [x] Remove `.git` from the Go module path, so plsp can depend on it without a `replace`
 - [x] Add `locals.scm` (definitions, references, scopes)
 - [x] Add `tags.scm`
 - [x] Grow `test/corpus` from the P repo's `Tst/` and `Tutorial/` programs
