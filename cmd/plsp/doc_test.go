@@ -29,7 +29,7 @@ func TestDoc(t *testing.T) {
 
 	var stdout, stderr strings.Builder
 	out := filepath.Join(dir, "docs")
-	if status := docs([]string{"-o", out, dir}, &stdout, &stderr); status != 0 || stdout.Len() > 0 || stderr.Len() > 0 {
+	if status := run([]string{"doc", "-o", out, dir}, nil, &stdout, &stderr); status != 0 || stdout.Len() > 0 || stderr.Len() > 0 {
 		t.Fatalf("doc -o = %d, stdout %q, stderr %q", status, stdout.String(), stderr.String())
 	}
 	read := func(name string) string {
@@ -55,7 +55,7 @@ func TestDoc(t *testing.T) {
 
 	// One project prints its page.
 	stdout.Reset()
-	if status := docs([]string{filepath.Join(dir, "Timer")}, &stdout, &stderr); status != 0 || !strings.HasPrefix(stdout.String(), "= Timer\n") {
+	if status := run([]string{"doc", filepath.Join(dir, "Timer")}, nil, &stdout, &stderr); status != 0 || !strings.HasPrefix(stdout.String(), "= Timer\n") {
 		t.Errorf("doc Timer = %d, stdout %q, stderr %q", status, stdout.String(), stderr.String())
 	}
 
@@ -66,7 +66,7 @@ func TestDoc(t *testing.T) {
 	} {
 		stdout.Reset()
 		stderr.Reset()
-		if status := docs(args, &stdout, &stderr); status != 2 || stdout.Len() > 0 || stderr.Len() == 0 {
+		if status := run(append([]string{"doc"}, args...), nil, &stdout, &stderr); status != 2 || stdout.Len() > 0 || stderr.Len() == 0 {
 			t.Errorf("doc %v = %d, stdout %q, stderr %q", args, status, stdout.String(), stderr.String())
 		}
 	}

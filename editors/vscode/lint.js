@@ -68,7 +68,7 @@ function show(problems) {
 function lint(paths) {
     const config = vscode.workspace.getConfiguration('plsp');
     return new Promise((resolve, reject) => {
-        cp.execFile(config.get('path'), ['lint', '-json', ...paths], { maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
+        cp.execFile(config.get('path'), ['lint', '--json', ...paths], { maxBuffer: 64 << 20 }, (err, stdout, stderr) => {
             // 1 means it found problems.
             if (err && err.code !== 1) {
                 reject(new Error(err.code === 'ENOENT' ? `can't run ${config.get('path')}` : stderr.trim() || err.message));
@@ -91,7 +91,7 @@ function lint(paths) {
     });
 }
 
-// toDiagnostic converts a problem plsp lint -json printed, an LSP
+// toDiagnostic converts a problem plsp lint --json printed, an LSP
 // diagnostic with its file, to a VS Code one.
 function toDiagnostic(p) {
     const position = (pos) => new vscode.Position(pos.line, pos.character);

@@ -48,7 +48,7 @@
             "type": "string"
           },
           "default": [],
-          "description": "Arguments to pass to plsp, such as [\"-compiler\", \"\"] to turn off type checking."
+          "description": "Arguments to pass to plsp, such as [\"--compiler\", \"\"] to turn off type checking."
         },
         "prdb.path": {
           "type": "string",

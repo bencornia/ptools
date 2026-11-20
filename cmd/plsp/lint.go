@@ -3,7 +3,6 @@ package main
 import (
 	"cmp"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -13,33 +12,39 @@ import (
 	"strings"
 
 	"github.com/bencornia/ptools/internal/analysis"
+	"github.com/bencornia/ptools/internal/cli"
 	"github.com/bencornia/ptools/internal/project"
 	"github.com/bencornia/ptools/internal/style"
+	"github.com/spf13/cobra"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
+func lintCommand() *cobra.Command {
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "lint [path ...]",
+		Short: "Check P files for lint problems",
+		Long: "Checks P files for names that don't follow the naming style, unused\n" +
+			"declarations, events that are never sent, unreachable states and code, and\n" +
+			"shadowed machine variables, as configured by the nearest " + style.FileName + " above each\n" +
+			"file. Directories are checked recursively, and with no path, the current one.\n\n" +
+			"The exit status is 0 if there are no problems, 1 if there are, and 2 if\n" +
+			"something couldn't be checked.",
+		RunE: func(cmd *cobra.Command, paths []string) error {
+			return cli.Exit(lint(paths, asJSON, cmd.OutOrStdout(), cmd.ErrOrStderr()))
+		},
+	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print the problems as a JSON array of LSP diagnostics, each with its file")
+	return cmd
+}
+
 // lint checks the P files under paths, as the editor does: their naming,
 // and the other checks a .plint.toml turns on. It prints each problem as
-// file:line:column: message (code), or with -json, as a JSON array of
-// diagnostics. It returns the exit status: 0 for none, 1 for problems, 2 if
-// something couldn't be checked.
-func lint(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("plsp lint", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	asJSON := flags.Bool("json", false, "print the problems as a JSON array of LSP diagnostics, each with its file")
-	flags.Usage = func() {
-		fmt.Fprintf(stderr, "usage: plsp lint [-json] [path ...]\n\n"+
-			"Checks P files for names that don't follow the naming style, unused\n"+
-			"declarations, events that are never sent, unreachable states and code, and\n"+
-			"shadowed machine variables, as configured by the nearest %s above each\n"+
-			"file. Directories are checked recursively, and with no path, the current one.\n\n", style.FileName)
-		flags.PrintDefaults()
-	}
-	if err := flags.Parse(args); err != nil {
-		return 2
-	}
-	paths := flags.Args()
+// file:line:column: message (code), or as a JSON array of diagnostics. It
+// returns the exit status: 0 for none, 1 for problems, 2 if something
+// couldn't be checked.
+func lint(paths []string, asJSON bool, stdout, stderr io.Writer) int {
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
@@ -72,7 +77,7 @@ func lint(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	if *asJSON {
+	if asJSON {
 		out, err := json.Marshal(problems)
 		if err != nil {
 			failed(err)
@@ -88,7 +93,7 @@ func lint(args []string, stdout, stderr io.Writer) int {
 	return status
 }
 
-// problem is a diagnostic in a file, as -json prints it.
+// problem is a diagnostic in a file, as --json prints it.
 type problem struct {
 	File string `json:"file"`
 	protocol.Diagnostic

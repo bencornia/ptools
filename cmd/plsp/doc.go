@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -11,35 +10,44 @@ import (
 	"strings"
 
 	"github.com/bencornia/ptools/internal/analysis"
+	"github.com/bencornia/ptools/internal/cli"
 	"github.com/bencornia/ptools/internal/doc"
 	"github.com/bencornia/ptools/internal/project"
+	"github.com/spf13/cobra"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
+func docCommand() *cobra.Command {
+	var o docOptions
+	cmd := &cobra.Command{
+		Use:   "doc [path ...]",
+		Short: "Write AsciiDoc reference documentation for P projects",
+		Long: "Writes AsciiDoc reference documentation for the P projects (.pproj files)\n" +
+			"among the paths and under the directories among them, the current one by\n" +
+			"default. A project's page opens with the README.adoc beside its .pproj, if\n" +
+			"there is one. Without -o, it prints the page of the one project found.\n" +
+			"Asciidoctor turns the pages into HTML.",
+		RunE: func(cmd *cobra.Command, paths []string) error {
+			return cli.Exit(docs(paths, o, cmd.OutOrStdout(), cmd.ErrOrStderr()))
+		},
+	}
+	cmd.Flags().StringVarP(&o.out, "out", "o", "", "write a page for each project, and index.adoc, to `dir`")
+	cmd.Flags().BoolVar(&o.private, "private", false, "document machines' variables and functions too")
+	cmd.Flags().StringVar(&o.title, "title", "P projects", "the index page's title")
+	return cmd
+}
+
+type docOptions struct {
+	out, title string
+	private    bool
+}
+
 // docs writes AsciiDoc reference documentation for the P projects (.pproj
-// files) among paths and under the directories among them: with -o, a
-// page for each project and an index page listing them, written to a
-// directory; without, the one project's page, printed. It returns the exit
-// status: 0, or 2 if something went wrong.
-func docs(args []string, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("plsp doc", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	out := flags.String("o", "", "write a page for each project, and index.adoc, to `dir`")
-	private := flags.Bool("private", false, "document machines' variables and functions too")
-	title := flags.String("title", "P projects", "the index page's title")
-	flags.Usage = func() {
-		fmt.Fprintf(stderr, "usage: plsp doc [-o dir] [-private] [-title title] [path ...]\n\n"+
-			"Writes AsciiDoc reference documentation for the P projects (.pproj files)\n"+
-			"among the paths and under the directories among them, the current one by\n"+
-			"default. A project's page opens with the README.adoc beside its .pproj, if\n"+
-			"there is one. Without -o, it prints the page of the one project found.\n"+
-			"Asciidoctor turns the pages into HTML.\n\n")
-		flags.PrintDefaults()
-	}
-	if err := flags.Parse(args); err != nil {
-		return 2
-	}
-	paths := flags.Args()
+// files) among paths and under the directories among them: with an output
+// directory, a page for each project and an index page listing them;
+// without, the one project's page, printed. It returns the exit status: 0,
+// or 2 if something went wrong.
+func docs(paths []string, o docOptions, stdout, stderr io.Writer) int {
 	if len(paths) == 0 {
 		paths = []string{"."}
 	}
@@ -52,7 +60,7 @@ func docs(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "no .pproj files in %s\n", strings.Join(paths, ", "))
 		return 2
 	}
-	if *out == "" && len(pprojs) > 1 {
+	if o.out == "" && len(pprojs) > 1 {
 		fmt.Fprintf(stderr, "found %d projects; use -o to write a page for each\n", len(pprojs))
 		return 2
 	}
@@ -68,21 +76,21 @@ func docs(args []string, stdout, stderr io.Writer) int {
 		}
 		projects = append(projects, p)
 	}
-	site := doc.NewSite(*title, projects, *private)
+	site := doc.NewSite(o.title, projects, o.private)
 
-	if *out == "" {
+	if o.out == "" {
 		if err := site.WritePage(stdout, projects[0]); err != nil {
 			fmt.Fprintln(stderr, err)
 			return 2
 		}
 		return 0
 	}
-	if err := os.MkdirAll(*out, 0o755); err != nil {
+	if err := os.MkdirAll(o.out, 0o755); err != nil {
 		fmt.Fprintln(stderr, err)
 		return 2
 	}
 	write := func(name string, render func(io.Writer) error) error {
-		f, err := os.Create(filepath.Join(*out, name))
+		f, err := os.Create(filepath.Join(o.out, name))
 		if err != nil {
 			return err
 		}

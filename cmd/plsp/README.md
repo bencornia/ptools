@@ -14,7 +14,7 @@ Saving a file that's listed in a `.pproj` type-checks its project with the
 [P compiler](https://p-org.github.io/P/getstarted/install/), and its errors
 appear alongside syntax errors. This needs `p` on your `PATH`; otherwise it's
 off, and the log says so. To use a different command, pass
-`-compiler "<command>"`, or `-compiler ""` to turn it off. Generated code goes
+`--compiler "<command>"`, or `--compiler ""` to turn it off. Generated code goes
 to a temporary directory, not your project.
 
 `p` is a .NET tool. An editor started from a desktop menu often doesn't
@@ -110,7 +110,7 @@ To check from the command line, as in CI, run `plsp lint`. It checks the P
 files under each path given (the current directory by default) against the
 files compiled with them, prints each problem as
 `file:line:column: message (check)`, and exits with 1 if it found any.
-`-json` prints them as LSP diagnostics instead, each with its `file`:
+`--json` prints them as LSP diagnostics instead, each with its `file`:
 
 ```sh
 plsp lint ./...
@@ -142,7 +142,7 @@ With `-o dir`, it writes a page for each project found under the paths
 given (the current directory by default) and an `index.adoc` listing them,
 with each one's directory and the first sentence of its overview. Pages
 link to the pages of the projects they include. Without `-o`, it prints the
-page of the one project found. `-private` documents machines' variables and
+page of the one project found. `--private` documents machines' variables and
 functions too. Asciidoctor turns the pages into HTML:
 
 ```sh
@@ -257,7 +257,7 @@ VS Code needs an extension to start a language server. The P extension in
 
 It highlights with the server's semantic tokens. Set `plsp.path` if
 `plsp` isn't on the `PATH` VS Code sees, and `plsp.args` to pass flags
-such as `["-compiler", ""]`. Format Document formats with pfmt; to format
+such as `["--compiler", ""]`. Format Document formats with pfmt; to format
 on save, add `"[p]": { "editor.formatOnSave": true }` to `settings.json`.
 
 Lint warnings show in the files you have open, as in any editor. To see

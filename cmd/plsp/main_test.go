@@ -58,7 +58,7 @@ type lspClient struct {
 func startServer(t *testing.T, args string) *lspClient {
 	t.Helper()
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
-	cmd.Env = append(os.Environ(), "P_LSP_TEST_SERVER=-stdio "+args)
+	cmd.Env = append(os.Environ(), "P_LSP_TEST_SERVER=--stdio "+args)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		t.Fatal(err)
@@ -245,7 +245,7 @@ func TestProtocol(t *testing.T) {
 	}
 	events, client := fileURI(filepath.Join(root, "PSrc/Events.p")), fileURI(filepath.Join(root, "PSrc/Client.p"))
 
-	c := startServer(t, "-compiler=")
+	c := startServer(t, "--compiler=")
 
 	var init struct {
 		Capabilities map[string]json.RawMessage `json:"capabilities"`
@@ -442,10 +442,10 @@ func TestProtocol(t *testing.T) {
 
 func TestVersionFlag(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
-	cmd.Env = append(os.Environ(), "P_LSP_TEST_SERVER=-version")
+	cmd.Env = append(os.Environ(), "P_LSP_TEST_SERVER=--version")
 	out, err := cmd.Output()
 	if err != nil || strings.TrimSpace(string(out)) != version {
-		t.Errorf("-version printed %q, %v", out, err)
+		t.Errorf("--version printed %q, %v", out, err)
 	}
 }
 
@@ -470,7 +470,7 @@ func TestLint(t *testing.T) {
 
 	// Events.p's events are sent from Main.p, which is compiled with it.
 	var stdout, stderr strings.Builder
-	status := lint([]string{filepath.Join(dir, "...")}, &stdout, &stderr)
+	status := run([]string{"lint", filepath.Join(dir, "...")}, nil, &stdout, &stderr)
 	want := filepath.Join(dir, "Other/Loose/Dead.p") + ":1:45: unreachable code after `return` (unreachable-code)\n" +
 		filepath.Join(dir, "PSrc/Events.p") + ":1:7: event name `lookup_done` should be TitleCase: `LookupDone` (naming)\n"
 	if status != 1 || stdout.String() != want || stderr.Len() > 0 {
@@ -478,15 +478,15 @@ func TestLint(t *testing.T) {
 	}
 
 	stdout.Reset()
-	if status := lint([]string{filepath.Join(dir, "PSrc/Main.p")}, &stdout, &stderr); status != 0 || stdout.Len() > 0 {
+	if status := run([]string{"lint", filepath.Join(dir, "PSrc/Main.p")}, nil, &stdout, &stderr); status != 0 || stdout.Len() > 0 {
 		t.Errorf("clean file: lint = %d, stdout %q", status, stdout.String())
 	}
-	if status := lint([]string{filepath.Join(dir, "missing.p")}, &stdout, &stderr); status != 2 {
+	if status := run([]string{"lint", filepath.Join(dir, "missing.p")}, nil, &stdout, &stderr); status != 2 {
 		t.Errorf("missing file: lint = %d, want 2", status)
 	}
 
 	stdout.Reset()
-	lint([]string{"-json", filepath.Join(dir, "Other/Loose/Dead.p")}, &stdout, &stderr)
+	run([]string{"lint", "--json", filepath.Join(dir, "Other/Loose/Dead.p")}, nil, &stdout, &stderr)
 	var problems []struct {
 		File  string
 		Code  string
@@ -494,18 +494,18 @@ func TestLint(t *testing.T) {
 		Tags  []int
 	}
 	if err := json.Unmarshal([]byte(stdout.String()), &problems); err != nil {
-		t.Fatalf("-json printed %q: %v", stdout.String(), err)
+		t.Fatalf("--json printed %q: %v", stdout.String(), err)
 	}
 	if len(problems) != 1 || problems[0].Code != "unreachable-code" || problems[0].Range.End.Character != 54 ||
 		len(problems[0].Tags) != 1 || !strings.HasSuffix(problems[0].File, "Dead.p") {
-		t.Errorf("-json printed %s", stdout.String())
+		t.Errorf("--json printed %s", stdout.String())
 	}
 }
 
 func TestHighlight(t *testing.T) {
 	src := "event ePing;\nmachine M {\n  start state S { entry { Ping(); send this, ePing; } }\n  fun Ping() {}\n}\n"
 	var stdout, stderr strings.Builder
-	if status := highlight(nil, strings.NewReader(src), &stdout, &stderr); status != 0 || stderr.Len() > 0 {
+	if status := run([]string{"highlight"}, strings.NewReader(src), &stdout, &stderr); status != 0 || stderr.Len() > 0 {
 		t.Fatalf("highlight = %d, stderr %q", status, stderr.String())
 	}
 	var tokens []struct {
@@ -529,7 +529,26 @@ func TestHighlight(t *testing.T) {
 		}
 	}
 
-	if status := highlight([]string{"missing.p"}, strings.NewReader(""), &stdout, &stderr); status != 2 {
+	if status := run([]string{"highlight", "missing.p"}, strings.NewReader(""), &stdout, &stderr); status != 2 {
 		t.Errorf("missing file: highlight = %d, want 2", status)
+	}
+}
+
+func TestUsage(t *testing.T) {
+	var stdout, stderr strings.Builder
+	for _, args := range [][]string{
+		{"-compiler", "p"}, // a long flag takes two dashes
+		{"lint", "--no-such-flag"},
+		{"highlight", "a.p", "b.p"},
+		{"no-such-command"},
+	} {
+		stderr.Reset()
+		if status := run(args, nil, &stdout, &stderr); status != 2 || stderr.Len() == 0 {
+			t.Errorf("plsp %v = %d, stderr %q; want 2 and an error", args, status, stderr.String())
+		}
+	}
+	stdout.Reset()
+	if status := run([]string{"lint", "--help"}, nil, &stdout, &stderr); status != 0 || !strings.Contains(stdout.String(), "--json") {
+		t.Errorf("plsp lint --help = %d, stdout %q", status, stdout.String())
 	}
 }

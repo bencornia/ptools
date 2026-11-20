@@ -70,7 +70,7 @@ directory, from the trace's up, with a `.pproj` file.
 
 ## Diagrams
 
-`prdb -diagram` draws a trace as a space-time diagram, in SVG: a column
+`prdb diagram` draws a trace as a space-time diagram, in SVG: a column
 for each machine, time running down, and an arrow for each event from the
 step that sent it to the step that dequeued it. An event that waited in an
 inbox while other things happened slants down across those steps, and one
@@ -79,19 +79,19 @@ debugger, and hovering one shows what PChecker logged for it, payloads in
 full. In a long diagram, the machines' names are repeated every 36 steps.
 
 ```sh
-prdb -diagram -o bug.svg PCheckerOutput/BugFinding/MyProject_0_0.trace.json
+prdb diagram -o bug.svg PCheckerOutput/BugFinding/MyProject_0_0.trace.json
 ```
 
 ![The planted bug in testdata/pingpong: the server counts the third ping twice, and the client's assertion fails](pingpong.svg)
 
-Like `-list`, it takes a trace, a `.schedule` file or `-testcase`, and
-`-schedule`. For a big trace, draw part of it:
+Like `prdb list`, it takes a trace, a `.schedule` file or `--testcase`, and
+`--schedule`. For a big trace, draw part of it:
 
 | Flag | Draws |
 |---|---|
-| `-machines Client,Server(3)` | only these machines, by type or name; events to others end in a short arrow naming them |
-| `-steps 120-180` | only these steps (also `120-` or `-180`) |
-| `-monitors=false` | no spec monitors |
+| `--machines Client,Server(3)` | only these machines, by type or name; events to others end in a short arrow naming them |
+| `--steps 120-180` | only these steps (also `120-` or `-180`) |
+| `--monitors=false` | no spec monitors |
 
 ## What it can't show
 
@@ -104,10 +104,10 @@ goto, print or receive.
 
 Build and install it as the [top-level README](../../README.md) says.
 
-`prdb -list trace.json` prints each step of a trace with its source
+`prdb list trace.json` prints each step of a trace with its source
 location, without an editor. It takes a `.schedule` file too, and
-`prdb -list -testcase tcMyTest` lists the bug PChecker finds in a test
-case. `-schedule n` picks a schedule of a `--verbose` trace.
+`prdb list --testcase tcMyTest` lists the bug PChecker finds in a test
+case. `--schedule n` picks a schedule of a `--verbose` trace.
 
 ## VS Code
 
@@ -220,7 +220,7 @@ PChecker wrote for it.
 - [x] Read PChecker's traces, of a bug or with `--verbose`
 - [x] Map each step to its handler or statement, through helper functions and included projects
 - [x] Debug adapter: a thread per machine, stepping both ways, breakpoints, payloads and inboxes, stopping at the failed assertion
-- [x] `prdb -list`
+- [x] `prdb list`
 - [x] VS Code: the debugger in plsp's VS Code extension, with a trace picker
 - [x] Launch from a `.schedule` file, replaying it with `p check --replay -v`
 - [x] Launch a test case: run `p check` to find a bug, then replay it

@@ -22,6 +22,11 @@ That builds `plsp`, `prdb` and `pfmt` into `~/.local/bin`, which the editor
 setups expect to be on your `PATH`. Building requires cgo (a C compiler),
 since tree-sitter is a C library.
 
+Each takes `--help`, as do plsp's and prdb's subcommands, and
+`completion bash`, `zsh`, `fish` or `powershell` prints a shell completion
+script, as in `source <(plsp completion bash)`. Long flags take two dashes,
+as in `--compiler`; single letters take one, as in `pfmt -w`.
+
 Type checking, running tests and replaying schedules need the
 [P compiler](https://p-org.github.io/P/getstarted/install/), `p`. plsp's
 and prdb's READMEs say where they look for it.

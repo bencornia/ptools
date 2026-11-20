@@ -1,21 +1,23 @@
 // Command plsp is a language server for the P programming language.
 //
-// Run as plsp lint [-json] [path ...], it checks P files for lint problems
+// Run as plsp lint [--json] [path ...], it checks P files for lint problems
 // instead: naming, unused declarations, and the other checks .plint.toml
-// configures. Run as plsp doc [-o dir] [-private] [path ...], it writes
+// configures. Run as plsp doc [-o dir] [--private] [path ...], it writes
 // AsciiDoc reference documentation for P projects. Run as plsp highlight
 // [file], it prints a file's semantic tokens as JSON, for highlighting P
 // outside an editor.
 package main
 
 import (
-	"flag"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/bencornia/ptools/internal/cli"
 	"github.com/bencornia/ptools/internal/server"
+	"github.com/spf13/cobra"
 	"github.com/tliron/commonlog"
 	_ "github.com/tliron/commonlog/simple"
 )
@@ -23,37 +25,44 @@ import (
 const version = "0.6.0"
 
 func main() {
-	if len(os.Args) > 1 && os.Args[1] == "lint" {
-		os.Exit(lint(os.Args[2:], os.Stdout, os.Stderr))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "highlight" {
-		os.Exit(highlight(os.Args[2:], os.Stdin, os.Stdout, os.Stderr))
-	}
-	if len(os.Args) > 1 && os.Args[1] == "doc" {
-		os.Exit(docs(os.Args[2:], os.Stdout, os.Stderr))
-	}
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
 
-	showVersion := flag.Bool("version", false, "print the version and exit")
-	verbosity := flag.Int("v", 0, "log verbosity (logs go to stderr)")
+// run runs plsp with args and returns the exit status.
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return cli.Run(rootCommand(), version, args, stdin, stdout, stderr)
+}
+
+func rootCommand() *cobra.Command {
+	var (
+		verbosity      int
+		compiler       string
+		compileTimeout time.Duration
+	)
+	root := &cobra.Command{
+		Use:   "plsp",
+		Short: "A language server for the P programming language",
+		Long: "plsp is a language server for the P programming language. It speaks the\n" +
+			"Language Server Protocol over standard input and output, for editors.",
+		Args: cli.Args(cobra.NoArgs),
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			commonlog.Configure(verbosity, nil)
+			s := server.New(version)
+			if command := strings.Fields(compiler); len(command) > 0 {
+				s.SetCompiler(command, compileTimeout)
+			}
+			if err := s.RunStdio(); err != nil {
+				return fmt.Errorf("serving: %w", err)
+			}
+			return nil
+		},
+	}
+	flags := root.Flags()
+	flags.IntVarP(&verbosity, "verbosity", "v", 0, "log verbosity (logs go to stderr)")
 	// Editors commonly pass --stdio; it's the only transport, so accept and ignore it.
-	flag.Bool("stdio", true, "communicate over stdin/stdout")
-	compiler := flag.String("compiler", "p", "command that runs the P compiler, for type-check diagnostics on save; empty turns them off")
-	compileTimeout := flag.Duration("compile-timeout", time.Minute, "how long a type check may take")
-	flag.Parse()
-
-	if *showVersion {
-		fmt.Println(version)
-		return
-	}
-
-	commonlog.Configure(*verbosity, nil)
-
-	s := server.New(version)
-	if command := strings.Fields(*compiler); len(command) > 0 {
-		s.SetCompiler(command, *compileTimeout)
-	}
-	if err := s.RunStdio(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	flags.Bool("stdio", true, "communicate over stdin/stdout")
+	flags.StringVar(&compiler, "compiler", "p", "command that runs the P compiler, for type-check diagnostics on save; empty turns them off")
+	flags.DurationVar(&compileTimeout, "compile-timeout", time.Minute, "how long a type check may take")
+	root.AddCommand(lintCommand(), docCommand(), highlightCommand())
+	return root
 }

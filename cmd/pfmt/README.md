@@ -40,7 +40,7 @@ pfmt PSrc/Client.p         # print the formatted file
 pfmt -w .                  # format every .p file under the directory in place
 pfmt -l .                  # list the files whose formatting differs
 pfmt -d .                  # print diffs of what formatting would change
-pfmt -indent 2 Client.p    # indent with 2 spaces instead of 4
+pfmt --indent 2 Client.p    # indent with 2 spaces instead of 4
 ```
 
 It exits with status 1 if a file couldn't be formatted, and 2 for bad usage
@@ -61,7 +61,7 @@ auto-format = true
 ```
 
 For another width, change `unit` and pass it to pfmt too, as in
-`formatter = { command = "pfmt", args = ["-indent", "2"] }`.
+`formatter = { command = "pfmt", args = ["--indent", "2"] }`.
 
 ## Neovim and VS Code
 
@@ -112,7 +112,7 @@ changes nothing. All of github.com/p-org/P passes.
 - [x] Format whitespace: indentation, spacing on a line, blank lines, file end
 - [x] Keep line breaks and comments, and align trailing comments
 - [x] Refuse code with syntax errors, and check that output has the same tokens
-- [x] `pfmt` command: stdin, files and directories, `-w`, `-l`, `-indent`
+- [x] `pfmt` command: stdin, files and directories, `-w`, `-l`, `--indent`
 - [x] Tests, and a corpus test over the P repo
 - [x] `-d` to print diffs instead of formatted files
 - [x] `textDocument/formatting` in plsp, using the `format` package

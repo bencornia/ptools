@@ -2,13 +2,29 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"path/filepath"
 
 	"github.com/bencornia/ptools/internal/analysis"
+	"github.com/bencornia/ptools/internal/cli"
+	"github.com/spf13/cobra"
 )
+
+func highlightCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "highlight [file]",
+		Short: "Print a P file's tokens as JSON, classified for highlighting",
+		Long: "Prints the tokens of a P file, or of standard input, as a JSON array of\n" +
+			"{\"start\", \"end\", \"type\", \"declaration\"} objects with byte offsets,\n" +
+			"classified as the editor classifies them. A file's names resolve across\n" +
+			"its project; standard input's resolve within itself.",
+		Args: cli.Args(cobra.MaximumNArgs(1)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cli.Exit(highlight(args, cmd.InOrStdin(), cmd.OutOrStdout(), cmd.ErrOrStderr()))
+		},
+	}
+}
 
 // highlight prints the tokens of a P file, or of standard input with no
 // file, classified as the editor's semantic highlighting classifies them,
@@ -17,30 +33,13 @@ import (
 // byte offsets. Names that don't resolve, and punctuation, are left out.
 // It returns the exit status: 0, or 2 if the input couldn't be read.
 func highlight(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	flags := flag.NewFlagSet("plsp highlight", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	flags.Usage = func() {
-		fmt.Fprintf(stderr, "usage: plsp highlight [file]\n\n"+
-			"Prints the tokens of a P file, or of standard input, as a JSON array of\n"+
-			"{\"start\", \"end\", \"type\", \"declaration\"} objects with byte offsets,\n"+
-			"classified as the editor classifies them. A file's names resolve across\n"+
-			"its project; standard input's resolve within itself.\n")
-	}
-	if err := flags.Parse(args); err != nil {
-		return 2
-	}
-	if flags.NArg() > 1 {
-		flags.Usage()
-		return 2
-	}
-
 	l := newLinter()
 	defer l.close()
 
 	var doc *analysis.Document
 	var workspace []*analysis.Document
-	if flags.NArg() == 1 {
-		abs, err := filepath.Abs(flags.Arg(0))
+	if len(args) == 1 {
+		abs, err := filepath.Abs(args[0])
 		if err != nil {
 			fmt.Fprintln(stderr, err)
 			return 2

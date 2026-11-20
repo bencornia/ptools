@@ -8,7 +8,7 @@ package main
 
 import (
 	"bytes"
-	"flag"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -16,52 +16,78 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/bencornia/ptools/internal/cli"
 	"github.com/bencornia/ptools/internal/diff"
 	"github.com/bencornia/ptools/internal/format"
+	"github.com/spf13/cobra"
 )
 
+const version = "0.1.0"
+
 func main() {
-	write := flag.Bool("w", false, "write the result to the files instead of printing it")
-	list := flag.Bool("l", false, "list the files whose formatting differs")
-	showDiff := flag.Bool("d", false, "print diffs of what formatting would change instead of formatted files")
-	indent := flag.Int("indent", 4, "spaces per indentation level")
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "usage: pfmt [flags] [path ...]\n")
-		flag.PrintDefaults()
-	}
-	flag.Parse()
-	opts := format.Options{Indent: *indent}
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
 
-	if flag.NArg() == 0 {
-		if *write || *list {
-			fail("-w and -l need files to work on")
-		}
-		src, err := io.ReadAll(os.Stdin)
-		if err != nil {
-			fail(err.Error())
-		}
-		out, err := format.Source(src, opts)
-		if err != nil {
-			fail("<stdin>: " + err.Error())
-		}
-		if *showDiff {
-			os.Stdout.Write(diff.Unified("<stdin>.orig", "<stdin>", src, out))
-		} else {
-			os.Stdout.Write(out)
-		}
-		return
-	}
+// run runs pfmt with args and returns the exit status.
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	return cli.Run(rootCommand(), version, args, stdin, stdout, stderr)
+}
 
-	failed := false
-	for _, path := range files(flag.Args()) {
-		if err := formatFile(path, opts, *write, *list, *showDiff); err != nil {
-			fmt.Fprintf(os.Stderr, "%s: %v\n", path, err)
-			failed = true
-		}
+// modes says what to do with formatted files.
+type modes struct {
+	write, list, diff bool
+}
+
+func rootCommand() *cobra.Command {
+	var m modes
+	var indent int
+	root := &cobra.Command{
+		Use:   "pfmt [path ...]",
+		Short: "Format P source code",
+		Long: "pfmt formats P source code. With no paths, it formats standard input to\n" +
+			"standard output. Given files, or directories, which it searches for .p\n" +
+			"files, it prints the formatted files, or with -w writes them back.",
+		Args: cobra.ArbitraryArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts := format.Options{Indent: indent}
+			stdout, stderr := cmd.OutOrStdout(), cmd.ErrOrStderr()
+			if len(args) == 0 {
+				if m.write || m.list {
+					return cli.Usage(errors.New("invalid argument: -w and -l need files to work on"))
+				}
+				src, err := io.ReadAll(cmd.InOrStdin())
+				if err != nil {
+					return err
+				}
+				out, err := format.Source(src, opts)
+				if err != nil {
+					fmt.Fprintf(stderr, "<stdin>: %v\n", err)
+					return cli.Exit(2)
+				}
+				if m.diff {
+					stdout.Write(diff.Unified("<stdin>.orig", "<stdin>", src, out))
+				} else {
+					stdout.Write(out)
+				}
+				return nil
+			}
+
+			status := 0
+			for _, path := range files(args) {
+				if err := formatFile(stdout, path, opts, m); err != nil {
+					fmt.Fprintf(stderr, "%s: %v\n", path, err)
+					status = 1
+				}
+			}
+			return cli.Exit(status)
+		},
 	}
-	if failed {
-		os.Exit(1)
-	}
+	flags := root.Flags()
+	flags.BoolVarP(&m.write, "write", "w", false, "write the result to the files instead of printing it")
+	flags.BoolVarP(&m.list, "list", "l", false, "list the files whose formatting differs")
+	flags.BoolVarP(&m.diff, "diff", "d", false, "print diffs of what formatting would change instead of formatted files")
+	flags.IntVar(&indent, "indent", 4, "spaces per indentation level")
+	return root
 }
 
 // files expands the arguments into files, with the .p files in each
@@ -91,7 +117,7 @@ func files(args []string) []string {
 	return paths
 }
 
-func formatFile(path string, opts format.Options, write, list, showDiff bool) error {
+func formatFile(stdout io.Writer, path string, opts format.Options, m modes) error {
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -101,26 +127,21 @@ func formatFile(path string, opts format.Options, write, list, showDiff bool) er
 		return err
 	}
 	changed := !bytes.Equal(src, out)
-	if list && changed {
-		fmt.Println(path)
+	if m.list && changed {
+		fmt.Fprintln(stdout, path)
 	}
-	if showDiff {
-		os.Stdout.Write(diff.Unified(path+".orig", path, src, out))
+	if m.diff {
+		stdout.Write(diff.Unified(path+".orig", path, src, out))
 	}
-	if write && changed {
+	if m.write && changed {
 		info, err := os.Stat(path)
 		if err != nil {
 			return err
 		}
 		return os.WriteFile(path, out, info.Mode().Perm())
 	}
-	if !list && !showDiff && !write {
-		os.Stdout.Write(out)
+	if !m.list && !m.diff && !m.write {
+		stdout.Write(out)
 	}
 	return nil
-}
-
-func fail(message string) {
-	fmt.Fprintln(os.Stderr, "pfmt: "+message)
-	os.Exit(2)
 }
