@@ -35,10 +35,11 @@ rest:
 - **Helix**, if you have it: it adds P to `languages.toml`, keeping the old
   one as `languages.toml.bak`, and builds the grammar and installs its
   queries. Building needs `git` and a C compiler.
-- **Neovim**, if you have it: if opening a P file doesn't start plsp, it
-  adds `plugin/ptools.lua` to Neovim's configuration directory, which sets
-  P up as [plsp's README](cmd/plsp/README.md#neovim) does. It doesn't touch
-  your own configuration; delete the file to undo it.
+- **Neovim** 0.11 or later, if you have it: if opening a P file doesn't
+  start plsp, it adds `plugin/ptools.lua` to Neovim's configuration
+  directory, which sets P up as [plsp's README](cmd/plsp/README.md#neovim)
+  does. It doesn't touch your own configuration; delete the file to undo
+  it.
 - **VS Code**, if you have it: it installs the release's extension.
 
 Run `plsp doctor` again at any time to check the setup, as after upgrading,
@@ -69,6 +70,16 @@ script, as in `source <(plsp completion bash)`. Long flags take two dashes,
 as in `--compiler`; single letters take one, as in `pfmt -w`.
 
 plsp's and prdb's READMEs say where they look for the P compiler.
+
+## Editors
+
+plsp works in any editor with a language server client; its README has
+the [setup](cmd/plsp/README.md#editor-setup) for Helix, Neovim and VS Code,
+which `plsp doctor --fix` does for you. Helix highlights P with the
+[tree-sitter-p](https://github.com/bencornia/tree-sitter-p) grammar and its
+queries, which the doctor builds and installs. Neovim and VS Code don't
+load the grammar themselves: they highlight with plsp's semantic tokens,
+and plsp parses with the grammar.
 
 ## VS Code
 

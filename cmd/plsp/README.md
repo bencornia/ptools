@@ -147,9 +147,16 @@ how to fix the rest.
 
 ## Editor setup
 
+`plsp doctor --fix` sets up Helix, Neovim and VS Code, whichever you have;
+what follows is what it does, to do by hand or for another editor.
+
 Open the folder that holds your `.pproj` files (or a parent of them) as the
 workspace. A file opened on its own still works: the server searches its
 parent directories for a `.pproj` that lists it.
+
+Helix highlights with the tree-sitter-p grammar and its queries. Neovim
+and VS Code highlight with the server's semantic tokens, which come from
+the same grammar.
 
 ### Helix
 
