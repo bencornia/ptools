@@ -22,11 +22,10 @@ jobs:
           - { runner: macos-latest, goos: darwin, goarch: arm64 }
           # Apple's clang cross-compiles to Intel Macs.
           - { runner: macos-latest, goos: darwin, goarch: amd64, cc: clang -arch x86_64, cross: true }
-          - { runner: windows-latest, goos: windows, goarch: amd64 }
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
       - name: Test
@@ -51,8 +50,8 @@ jobs:
           cp README.md LICENSE dist/ptools/
           name=ptools_${GOOS}_${GOARCH}
           cd dist/ptools
-          if [ "$GOOS" = windows ]; then 7z a -tzip "../$name.zip" . > /dev/null; else tar -czf "../$name.tar.gz" *; fi
-      - uses: actions/upload-artifact@v4
+          tar -czf "../$name.tar.gz" *
+      - uses: actions/upload-artifact@v7
         with:
           name: ptools_${{ matrix.goos }}_${{ matrix.goarch }}
           path: dist/ptools_*
@@ -60,8 +59,8 @@ jobs:
   vsix:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Package
@@ -69,7 +68,7 @@ jobs:
         run: |
           npm ci
           npx --yes @vscode/vsce package --skip-license
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsix
           path: editors/vscode/*.vsix
@@ -79,13 +78,13 @@ jobs:
     needs: [build, vsix]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check the version
         run: |
           v=${GITHUB_REF_NAME#v}
           grep -q "Version = \"$v\"" internal/version/version.go || { echo "internal/version isn't $v"; exit 1; }
           grep -q "\"version\": \"$v\"" editors/vscode/package.json || { echo "the extension's version isn't $v"; exit 1; }
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true

@@ -44,9 +44,8 @@ add. To install somewhere else, set `PTOOLS_BIN`; to install another
 release, set `PTOOLS_VERSION`, as in `PTOOLS_VERSION=0.8.0`; and to only
 check, set `PTOOLS_FIX=0`.
 
-On Windows, download `ptools_windows_amd64.zip` from the
-[latest release](https://github.com/bencornia/ptools/releases/latest), and
-put its programs on your `PATH`.
+Windows isn't supported yet: plsp doesn't build there, because a library
+the language server depends on doesn't.
 
 ### From source
 
@@ -117,7 +116,7 @@ git push origin v0.8.0
 ```
 
 The [release workflow](.github/workflows/release.yml) then tests and builds
-the tools for Linux and macOS (amd64 and arm64) and Windows (amd64),
+the tools for Linux and macOS, on amd64 and arm64,
 packages the extension, and attaches them and a `checksums.txt` to the
 tag's release, which it makes with the tag's message as its notes.
 `install.sh` installs from the latest release. To try the builds without

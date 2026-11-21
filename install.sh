@@ -26,7 +26,7 @@ fail() {
 case $(uname -s) in
 Linux) os=linux ;;
 Darwin) os=darwin ;;
-*) fail "there's no build for $(uname -s); on Windows, download ptools_windows_amd64.zip from $repo/releases" ;;
+*) fail "there's no build for $(uname -s), only Linux and macOS" ;;
 esac
 case $(uname -m) in
 x86_64 | amd64) arch=amd64 ;;
