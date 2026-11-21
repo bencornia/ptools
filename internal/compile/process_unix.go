@@ -5,6 +5,7 @@ package compile
 import (
 	"os/exec"
 	"syscall"
+	"time"
 )
 
 // stopTree makes canceling cmd kill the compiler's whole process group, so
@@ -13,6 +14,18 @@ import (
 func stopTree(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		group := -cmd.Process.Pid
+		err := syscall.Kill(group, syscall.SIGKILL)
+		// On macOS, a child forked as the group is killed can miss the
+		// signal, so kill the group again until no one is left in it.
+		go func() {
+			for range 40 {
+				time.Sleep(25 * time.Millisecond)
+				if syscall.Kill(group, syscall.SIGKILL) != nil {
+					return
+				}
+			}
+		}()
+		return err
 	}
 }
