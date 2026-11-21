@@ -52,6 +52,12 @@ func (x *Index) Projects() []string {
 	return paths
 }
 
+// Project returns the loaded project whose .pproj file is path.
+func (x *Index) Project(path string) (*Project, bool) {
+	p, ok := x.projects[path]
+	return p, ok
+}
+
 // Owners returns the .pproj files that list file directly, sorted.
 func (x *Index) Owners(file string) []string {
 	var paths []string

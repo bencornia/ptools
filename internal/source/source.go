@@ -3,7 +3,7 @@
 package source
 
 import (
-	"encoding/xml"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/bencornia/ptools/internal/project"
 	tree_sitter_p "github.com/bencornia/tree-sitter-p/bindings/go"
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
@@ -98,9 +99,11 @@ type Index struct {
 // skipped are directories that hold generated code or checker output.
 var skipped = map[string]bool{"PGenerated": true, "PCheckerOutput": true, "node_modules": true}
 
-// Load parses the .p files under root, and under the directories of the
-// projects its .pproj files include, as in
-// <IncludeProject>../Common/Timer/Timer.pproj</IncludeProject>.
+// Load parses the P source of the project in root, as the compiler reads
+// it: the files root's .pproj files list in <InputFiles>, then those of the
+// projects they include, as in
+// <IncludeProject>../Common/Timer/Timer.pproj</IncludeProject>. Without a
+// .pproj, it parses every .p file under root.
 func Load(root string) (*Index, error) {
 	root, err := filepath.Abs(root)
 	if err != nil {
@@ -112,60 +115,61 @@ func Load(root string) (*Index, error) {
 	if err := parser.SetLanguage(sitter.NewLanguage(tree_sitter_p.Language())); err != nil {
 		return nil, err
 	}
-	walked := []string{}
-	for _, dir := range append([]string{root}, includedDirs(root)...) {
-		if slices.ContainsFunc(walked, func(w string) bool { return within(dir, w) }) {
-			continue
-		}
-		walked = append(walked, dir)
-		if err := x.loadDir(parser, dir); err != nil {
-			return nil, err
-		}
+	files, err := projectFiles(root)
+	if err != nil {
+		return nil, err
+	}
+	if files == nil {
+		return x, x.loadDir(parser, root)
+	}
+	for _, path := range files {
+		x.loadFile(parser, path)
 	}
 	return x, nil
 }
 
-// within reports whether dir is root or under it.
-func within(dir, root string) bool {
-	rel, err := filepath.Rel(root, dir)
-	return err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
-// includedDirs returns the directories of the projects that root's .pproj
-// files include, directly or through each other.
-func includedDirs(root string) []string {
-	var dirs []string
+// projectFiles returns the .p files the projects in root compile: their
+// own, then their included projects', or nil if root has no .pproj files.
+func projectFiles(root string) ([]string, error) {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+	var pprojs []string
+	for _, e := range entries {
+		if !e.IsDir() && strings.EqualFold(filepath.Ext(e.Name()), ".pproj") {
+			pprojs = append(pprojs, filepath.Join(root, e.Name()))
+		}
+	}
+	if len(pprojs) == 0 {
+		return nil, nil
+	}
+	index := project.NewIndex()
+	index.Load(pprojs...)
+	files := []string{}
 	seen := map[string]bool{}
-	var visit func(pproj string)
-	visit = func(pproj string) {
-		if seen[pproj] {
-			return
+	for _, path := range pprojs {
+		p, ok := index.Project(path)
+		if !ok {
+			return nil, fmt.Errorf("reading %s: %w", path, index.Errors[path])
 		}
-		seen[pproj] = true
-		data, err := os.ReadFile(pproj)
-		if err != nil {
-			return
-		}
-		var project struct {
-			Includes []string `xml:"IncludeProject"`
-		}
-		if xml.Unmarshal(data, &project) != nil {
-			return
-		}
-		for _, include := range project.Includes {
-			path := filepath.Clean(filepath.Join(filepath.Dir(pproj), strings.TrimSpace(include)))
-			dirs = append(dirs, filepath.Dir(path))
-			visit(path)
+		for _, f := range p.Files {
+			if !seen[f] {
+				seen[f] = true
+				files = append(files, f)
+			}
 		}
 	}
-	projects, _ := filepath.Glob(filepath.Join(root, "*.pproj"))
-	for _, p := range projects {
-		visit(p)
+	for _, f := range index.Files() {
+		if !seen[f] {
+			seen[f] = true
+			files = append(files, f)
+		}
 	}
-	return dirs
+	return files, nil
 }
 
-// loadDir parses the .p files under dir.
+// loadDir parses the .p files under dir, for a directory without a project.
 func (x *Index) loadDir(parser *sitter.Parser, dir string) error {
 	return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -177,18 +181,22 @@ func (x *Index) loadDir(parser *sitter.Parser, dir string) error {
 			}
 			return nil
 		}
-		if !strings.HasSuffix(path, ".p") || strings.HasPrefix(d.Name(), ".") {
-			return nil
+		if strings.HasSuffix(path, ".p") && !strings.HasPrefix(d.Name(), ".") {
+			x.loadFile(parser, path)
 		}
-		text, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		f := &File{Path: path, Text: text, Tree: parser.Parse(text, nil)}
-		x.Files = append(x.Files, f)
-		x.index(f)
 		return nil
 	})
+}
+
+// loadFile parses and indexes the file at path, if it can be read.
+func (x *Index) loadFile(parser *sitter.Parser, path string) {
+	text, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	f := &File{Path: path, Text: text, Tree: parser.Parse(text, nil)}
+	x.Files = append(x.Files, f)
+	x.index(f)
 }
 
 // Close frees the syntax trees.

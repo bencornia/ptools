@@ -12,10 +12,12 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+
+	pproject "github.com/bencornia/ptools/internal/project"
+	"github.com/bencornia/ptools/internal/ptool"
 )
 
 // Schedule compiles the P project in project and replays schedule, a
@@ -211,29 +213,35 @@ func copyFile(from, to string) error {
 // directory.
 type checker struct {
 	project, pproj string
-	command        string
-	args, env      []string
-	dir            string
-	progress       io.Writer
+	// name is the project's, which names the assembly the compiler builds.
+	name      string
+	command   string
+	args, env []string
+	dir       string
+	progress  io.Writer
 }
 
 func newChecker(project string, compiler []string, progress io.Writer) (*checker, error) {
 	if len(compiler) == 0 {
 		compiler = []string{"p"}
 	}
-	command, env, err := findCompiler(compiler[0])
+	command, env, err := ptool.Find(compiler)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("replaying needs the P compiler, and %q isn't on the PATH; set the launch configuration's compiler to the command that runs it", compiler[0])
 	}
 	pprojs, _ := filepath.Glob(filepath.Join(project, "*.pproj"))
 	if len(pprojs) == 0 {
 		return nil, fmt.Errorf("no .pproj file in %s to compile", project)
 	}
+	p, err := pproject.Parse(pprojs[0])
+	if err != nil {
+		return nil, err
+	}
 	dir, err := os.MkdirTemp("", "prdb-replay-")
 	if err != nil {
 		return nil, err
 	}
-	return &checker{project: project, pproj: pprojs[0], command: command, args: compiler[1:], env: env, dir: dir, progress: progress}, nil
+	return &checker{project: project, pproj: p.Path, name: p.Name, command: command[0], args: command[1:], env: env, dir: dir, progress: progress}, nil
 }
 
 func (c *checker) clean() { os.RemoveAll(c.dir) }
@@ -261,55 +269,16 @@ func (c *checker) run(args ...string) ([]byte, error) {
 // still makes the project's output directory; compile removes it again
 // if it made it and it's empty.
 func (c *checker) compile() (string, error) {
-	before := entries(c.project)
+	before := ptool.Names(c.project)
 	c.say("Compiling %s", filepath.Base(c.pproj))
 	build := filepath.Join(c.dir, "build")
 	_, err := c.run("compile", "--pproj", c.pproj, "--outdir", build)
-	removeNewEmpty(c.project, before)
+	ptool.RemoveNewEmpty(c.project, before)
 	if err != nil {
 		return "", err
 	}
-	return checkerDLL(build, projectName(c.pproj))
+	return checkerDLL(build, c.name)
 }
-
-// findCompiler finds the P tool, name, and the environment to run it in.
-// Editors started from a desktop often lack the PATH and DOTNET_ROOT a
-// shell profile sets, so when name is the default "p" and isn't on the
-// PATH, it looks where `dotnet tool install --global` puts it, and runs it
-// with the .NET it was installed with.
-func findCompiler(name string) (command string, env []string, err error) {
-	env = os.Environ()
-	if path, err := exec.LookPath(name); err == nil {
-		return path, env, nil
-	}
-	home, _ := os.UserHomeDir()
-	if name == "p" && home != "" {
-		tool := filepath.Join(home, ".dotnet", "tools", "p")
-		if _, err := os.Stat(tool); err == nil {
-			root := os.Getenv("DOTNET_ROOT")
-			if root == "" {
-				root = filepath.Join(home, ".dotnet")
-			}
-			if _, err := os.Stat(filepath.Join(root, "dotnet")); err == nil {
-				env = append(env, "DOTNET_ROOT="+root, "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"))
-			}
-			return tool, env, nil
-		}
-	}
-	return "", nil, fmt.Errorf("replaying a schedule needs the P compiler, and %q isn't on the PATH; set the launch configuration's compiler to the command that runs it", name)
-}
-
-// projectName returns the name the compiler gives a project's assembly:
-// its <ProjectName>, or else the .pproj file's name.
-func projectName(pproj string) string {
-	data, _ := os.ReadFile(pproj)
-	if m := projectNameElement.FindSubmatch(data); m != nil {
-		return strings.TrimSpace(string(m[1]))
-	}
-	return strings.TrimSuffix(filepath.Base(pproj), ".pproj")
-}
-
-var projectNameElement = regexp.MustCompile(`<ProjectName>([^<]+)</ProjectName>`)
 
 // checkerDLL finds the assembly the compiler built for PChecker: the one
 // named after the project, outside obj/.
@@ -331,24 +300,4 @@ func checkerDLL(build, name string) (string, error) {
 		return "", fmt.Errorf("the compiler built no %s.dll", name)
 	}
 	return found, nil
-}
-
-func entries(dir string) map[string]bool {
-	names := map[string]bool{}
-	list, _ := os.ReadDir(dir)
-	for _, e := range list {
-		names[e.Name()] = true
-	}
-	return names
-}
-
-// removeNewEmpty removes the empty directories in dir that weren't there
-// before.
-func removeNewEmpty(dir string, before map[string]bool) {
-	list, _ := os.ReadDir(dir)
-	for _, e := range list {
-		if e.IsDir() && !before[e.Name()] {
-			os.Remove(filepath.Join(dir, e.Name())) // fails unless empty
-		}
-	}
 }
