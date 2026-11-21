@@ -15,12 +15,11 @@ import (
 
 	"github.com/bencornia/ptools/internal/cli"
 	"github.com/bencornia/ptools/internal/server"
+	"github.com/bencornia/ptools/internal/version"
 	"github.com/spf13/cobra"
 	"github.com/tliron/commonlog"
 	_ "github.com/tliron/commonlog/simple"
 )
-
-const version = "0.6.0"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
@@ -28,7 +27,7 @@ func main() {
 
 // run runs plsp with args and returns the exit status.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return cli.Run(rootCommand(), version, args, stdin, stdout, stderr)
+	return cli.Run(rootCommand(), args, stdin, stdout, stderr)
 }
 
 func rootCommand() *cobra.Command {
@@ -45,7 +44,7 @@ func rootCommand() *cobra.Command {
 		Args: cli.Args(cobra.NoArgs),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			commonlog.Configure(verbosity, nil)
-			s := server.New(version)
+			s := server.New(version.Version)
 			if command := strings.Fields(compiler); len(command) > 0 {
 				s.SetCompiler(command, compileTimeout)
 			}

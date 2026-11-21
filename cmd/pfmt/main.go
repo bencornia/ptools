@@ -22,15 +22,13 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const version = "0.1.0"
-
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
 // run runs pfmt with args and returns the exit status.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
-	return cli.Run(rootCommand(), version, args, stdin, stdout, stderr)
+	return cli.Run(rootCommand(), args, stdin, stdout, stderr)
 }
 
 // modes says what to do with formatted files.

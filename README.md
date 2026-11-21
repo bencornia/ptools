@@ -66,3 +66,10 @@ go work init . ../tree-sitter-p
 After regenerating the grammar, rebuild with `go build -a`. The Go binding
 `#include`s `parser.c` from outside its package, so a plain `go build` can
 reuse a stale cached parser.
+
+## Releasing
+
+Every command reports one version, the ptools release. To release, set it
+in `internal/version` and in `editors/vscode/package.json` (and
+`package-lock.json`), commit, and tag the commit `v` and the version, as in
+`v0.7.0`.

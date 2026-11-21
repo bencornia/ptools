@@ -10,13 +10,14 @@ import (
 	"io"
 	"strconv"
 
+	"github.com/bencornia/ptools/internal/version"
 	"github.com/charmbracelet/fang"
 	"github.com/spf13/cobra"
 )
 
 // Run executes root with args, reading stdin and writing stdout and stderr,
-// and returns the exit status.
-func Run(root *cobra.Command, version string, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+// and returns the exit status. --version prints the ptools release.
+func Run(root *cobra.Command, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	root.SetArgs(args)
 	root.SetIn(stdin)
 	root.SetOut(stdout)
@@ -25,7 +26,7 @@ func Run(root *cobra.Command, version string, args []string, stdin io.Reader, st
 	root.SetVersionTemplate("{{.Version}}\n")
 	root.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usageError{err} })
 	err := fang.Execute(context.Background(), root,
-		fang.WithVersion(version),
+		fang.WithVersion(version.Version),
 		fang.WithErrorHandler(func(w io.Writer, styles fang.Styles, err error) {
 			var status exitStatus
 			if errors.As(err, &status) {

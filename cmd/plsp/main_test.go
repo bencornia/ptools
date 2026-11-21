@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bencornia/ptools/internal/version"
 	protocol "github.com/tliron/glsp/protocol_3_16"
 )
 
@@ -444,7 +445,7 @@ func TestVersionFlag(t *testing.T) {
 	cmd := exec.Command(os.Args[0], "-test.run=^$")
 	cmd.Env = append(os.Environ(), "P_LSP_TEST_SERVER=--version")
 	out, err := cmd.Output()
-	if err != nil || strings.TrimSpace(string(out)) != version {
+	if err != nil || strings.TrimSpace(string(out)) != version.Version {
 		t.Errorf("--version printed %q, %v", out, err)
 	}
 }
