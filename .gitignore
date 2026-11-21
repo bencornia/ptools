@@ -4,3 +4,7 @@ go.work.sum
 # Made by running prdb's tests and the P tools in testdata.
 PGenerated/
 PCheckerOutput/
+/plsp
+/prdb
+/pfmt
+/pdoc
