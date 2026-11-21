@@ -33,7 +33,7 @@ pdoc -o docs .
 asciidoctor docs/*.adoc
 ```
 
-Install it as the [top-level README](../../README.md) says.
+Install it as the [top-level README](../../README.md#installing) says.
 
 Doc comments are the comment directly above a declaration, with no blank
 line between. A comment after code on the line above isn't one, and lines

@@ -30,7 +30,7 @@ formatting would change anything but whitespace, it reports an error instead.
 
 ## Installing
 
-Build and install it as the [top-level README](../../README.md) says.
+Install it as the [top-level README](../../README.md#installing) says.
 
 ## Usage
 

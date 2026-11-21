@@ -1,7 +1,7 @@
 # plsp
 
 A language server for the [P programming language](https://github.com/p-org/P).
-Build and install it as the [top-level README](../../README.md) says.
+Install it as the [top-level README](../../README.md#installing) says.
 
 ## Running
 
@@ -154,10 +154,16 @@ parent directories for a `.pproj` that lists it.
 ### Helix
 
 Helix doesn't use semantic tokens, so colors come from the tree-sitter-p
-grammar. `plsp doctor --fix` sets Helix up: it adds what's below to
-`languages.toml` if P isn't there, keeps the grammar's `rev` at the commit
-plsp parses with, and builds the grammar and installs its queries. Run it
-again after upgrading ptools.
+grammar. Installing ptools sets Helix up:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/bencornia/ptools/main/install.sh | sh
+```
+
+That installs the tools and then runs `plsp doctor --fix`, which adds
+what's below to `languages.toml` if P isn't there, keeps the grammar's
+`rev` at the commit plsp parses with, and builds the grammar and installs
+its queries. Run `plsp doctor --fix` again after upgrading ptools.
 
 To set it up by hand instead, add this to `~/.config/helix/languages.toml`:
 
@@ -196,8 +202,8 @@ hx --health p
 ```
 
 To pick up grammar changes, update `rev` and run the last three commands
-again, or run `plsp doctor --fix`. `space d` lists errors (syntax errors as you type, type errors on
-save), and `gd`, `gr`, `space k`, `space r`, `space s` and `space S` are
+again, or run `plsp doctor --fix`. `space d` lists errors (syntax errors
+as you type, type errors on save), and `gd`, `gr`, `space k`, `space r`, `space s` and `space S` are
 definition, references, hover, rename and symbols.
 
 ### Neovim

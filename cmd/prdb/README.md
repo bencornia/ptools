@@ -123,7 +123,7 @@ goto, print or receive.
 
 ## Installing
 
-Build and install it as the [top-level README](../../README.md) says.
+Install it as the [top-level README](../../README.md#installing) says.
 
 `prdb list trace.json` prints each step of a trace with its source
 location, without an editor. It takes a `.schedule` file too, and
@@ -133,8 +133,9 @@ case. `--schedule n` picks a schedule of a `--verbose` trace.
 ## VS Code
 
 The debugger is part of the P extension, in
-[`editors/vscode`](../../editors/vscode). Install prdb and the extension as
-the [top-level README](../../README.md#vs-code) says.
+[`editors/vscode`](../../editors/vscode). Installing ptools, as the
+[top-level README](../../README.md#installing) says, installs both prdb and
+the extension.
 
 Open a `.p` file and start debugging (F5, or Run and Debug): with no
 `launch.json`, it asks what to debug: one of the workspace's traces and
