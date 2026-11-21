@@ -1,11 +1,9 @@
-// Runs and debugs the test cases plsp puts lenses over. Run test compiles
-// the project and checks the test case with p check in a terminal; if
-// PChecker finds a bug, it offers to step through the bug's trace with
-// prdb. Debug test has prdb check the test case itself, until PChecker
-// finds a bug, and debug that.
+// Runs and debugs the test cases plsp puts lenses over. Run test runs
+// prdb check in a terminal, which compiles the project and checks the test
+// case with PChecker; if it finds a bug, it offers to step through the
+// bug's trace with prdb. Debug test has prdb check the test case itself,
+// until PChecker finds a bug, and debug that.
 const cp = require('child_process');
-const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const vscode = require('vscode');
 
@@ -26,7 +24,7 @@ async function runTest(test, projectOf) {
     }
     const config = vscode.workspace.getConfiguration('p');
     const schedules = schedulesSetting(config);
-    const run = new TestRun(test.name, project, pCommand(config.get('command')), schedules);
+    const run = new TestRun(test.name, project, vscode.workspace.getConfiguration('prdb').get('path'), config.get('command'), schedules);
     const task = new vscode.Task(
         { type: 'p', test: test.name },
         vscode.workspace.getWorkspaceFolder(vscode.Uri.file(test.file)) ?? vscode.TaskScope.Workspace,
@@ -71,13 +69,13 @@ async function debugTest(test, projectOf) {
     });
 }
 
-// TestRun is the terminal a test case runs in: it compiles the project,
-// then checks the test case, showing their output as they go. done
-// resolves when it's finished, to { bug: { test, trace } } for the bug
-// PChecker found, if any, or { error } if the test couldn't be run.
+// TestRun is the terminal a test case runs in: prdb check, showing the P
+// tool's output as it goes. done resolves when it's finished, to
+// { bug: { test, trace } } for the bug PChecker found, if any, or { error }
+// if the test couldn't be run.
 class TestRun {
-    constructor(name, project, command, schedules) {
-        Object.assign(this, { name, project, command, schedules });
+    constructor(name, project, prdb, compiler, schedules) {
+        Object.assign(this, { name, project, prdb, compiler, schedules });
         this.writer = new vscode.EventEmitter();
         this.closer = new vscode.EventEmitter();
         this.onDidWrite = this.writer.event;
@@ -96,38 +94,28 @@ class TestRun {
         this.finish({ error: 'stopped' });
     }
 
-    async run() {
-        const compiled = await this.spawn(['compile']);
-        if (compiled.error) return compiled;
-        if (compiled.code !== 0) return { error: `compiling ${path.basename(this.project)} failed` };
-        const checked = await this.spawn(['check', '--testcase', this.name, '--schedules', String(this.schedules)]);
-        if (checked.error) return checked;
-        const { ran, bug } = findBug(checked.output, this.name, this.project);
-        if (bug) return { bug };
-        if (checked.code !== 0) return { error: `p check exited with ${checked.code}` };
-        if (!ran) return { error: `p check found no test case ${this.name}; is the project compiled with its file?` };
-        return {};
-    }
-
-    // spawn runs the P tool with args in the project, showing its output,
-    // and resolves to its exit code and output, or { error }.
-    spawn(args) {
-        const [command, ...rest] = this.command.argv;
-        this.write(`> ${[path.basename(command), ...rest, ...args].join(' ')}\n`);
+    // run runs prdb check, and resolves to what it found.
+    run() {
+        const args = ['check', '--json', '--project', this.project, '--schedules', String(this.schedules)];
+        for (const arg of this.compiler?.length ? this.compiler : []) {
+            args.push('--compiler', arg);
+        }
+        args.push(this.name);
+        this.write(`> ${[path.basename(this.prdb), ...args].join(' ')}\n`);
         return new Promise((resolve) => {
-            let output = '';
-            const child = cp.spawn(command, [...rest, ...args], { cwd: this.project, env: this.command.env });
+            let stdout = '';
+            let stderr = '';
+            const child = cp.spawn(this.prdb, args, { cwd: this.project });
             this.child = child;
-            const show = (data) => {
-                output += data;
+            child.stdout.on('data', (data) => (stdout += data));
+            child.stderr.on('data', (data) => {
+                stderr += data;
                 this.write(String(data));
-            };
-            child.stdout.on('data', show);
-            child.stderr.on('data', show);
+            });
             child.on('error', (err) =>
-                resolve({ error: err.code === 'ENOENT' ? `can't run ${command}; set p.command to the command that runs the P tool` : err.message }),
+                resolve({ error: err.code === 'ENOENT' ? `can't run ${this.prdb}; set prdb.path to the prdb binary` : err.message }),
             );
-            child.on('close', (code) => resolve({ code, output }));
+            child.on('close', (code) => resolve(checkResult(code, stdout, stderr)));
         });
     }
 
@@ -136,37 +124,18 @@ class TestRun {
     }
 }
 
-// findBug reads p check's output for whether it ran the test case name,
-// or one of a parameterised test's cases, named name___..., and the bug it
-// found in them, if any: the case and the trace it wrote, relative paths
-// being in project. Each case writes the same files, so it's the last bug
-// whose trace is still there. -tc runs every test case whose name starts
-// with name, so others may have run too.
-function findBug(output, name, project) {
-    let current;
-    let ran = false;
-    let bug;
-    for (const raw of output.split('\n')) {
-        const line = raw.trim();
-        const test = line.match(/^\.\. Test case :: (.*)$/);
-        if (test) {
-            current = test[1].trim();
-            ran ||= isCase(current, name);
-            continue;
-        }
-        const ours = current !== undefined && isCase(current, name);
-        const written = line.match(/^\.\.\.\.\. Writing (.*\.trace\.json)$/);
-        if (ours && written) {
-            bug = { test: current, trace: path.resolve(project, written[1]) };
-        }
+// checkResult reads what prdb check --json found from its exit status and
+// output: { bug } for a bug, {} for none, or { error } with the last line
+// it wrote to standard error, which says what went wrong.
+function checkResult(code, stdout, stderr) {
+    let result;
+    try {
+        result = JSON.parse(stdout);
+    } catch {
+        const lines = stderr.trim().split('\n');
+        return { error: lines[lines.length - 1].trim() || `prdb check exited with ${code}` };
     }
-    return { ran, bug };
-}
-
-// isCase reports whether the test case p check ran, test, is name or one
-// of its cases.
-function isCase(test, name) {
-    return test === name || test.startsWith(name + '___');
+    return result.bug ? { bug: result.bug } : {};
 }
 
 // schedulesSetting returns p.schedules, or its default, 1000, if it's unset
@@ -177,32 +146,4 @@ function schedulesSetting(config) {
     return Number.isInteger(schedules) && schedules > 0 ? schedules : 1000;
 }
 
-// pCommand finds the command that runs the P tool, and the environment to
-// run it in. Editors started from a desktop often lack the PATH and
-// DOTNET_ROOT a shell profile sets, so when it's the default p and isn't
-// on the PATH, it looks where `dotnet tool install --global` puts it, as
-// prdb does.
-function pCommand(argv) {
-    argv = argv?.length ? argv : ['p'];
-    const env = { ...process.env };
-    if (argv[0] !== 'p' || onPath('p')) {
-        return { argv, env };
-    }
-    const dotnet = path.join(os.homedir(), '.dotnet');
-    const tool = path.join(dotnet, 'tools', 'p');
-    if (!fs.existsSync(tool)) {
-        return { argv, env };
-    }
-    const root = env.DOTNET_ROOT || dotnet;
-    if (fs.existsSync(path.join(root, 'dotnet'))) {
-        env.DOTNET_ROOT = root;
-        env.PATH = root + path.delimiter + (env.PATH ?? '');
-    }
-    return { argv: [tool, ...argv.slice(1)], env };
-}
-
-function onPath(name) {
-    return (process.env.PATH ?? '').split(path.delimiter).some((dir) => dir && fs.existsSync(path.join(dir, name)));
-}
-
-module.exports = { registerTests, findBug, pCommand, schedulesSetting, TestRun };
+module.exports = { registerTests, checkResult, schedulesSetting, TestRun };

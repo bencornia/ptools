@@ -1,6 +1,7 @@
 package replay
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -213,5 +214,54 @@ func TestTestRuns(t *testing.T) {
 		if got := ofTest(runs, name); !slices.Equal(got, want) {
 			t.Errorf("%s: %+v, want %+v", name, got, want)
 		}
+	}
+}
+
+func TestCheck(t *testing.T) {
+	if _, err := exec.LookPath("p"); err != nil {
+		t.Skip("the P compiler isn't installed")
+	}
+	project := t.TempDir()
+	if err := os.CopyFS(project, os.DirFS("../../testdata/pingpong")); err != nil {
+		t.Fatal(err)
+	}
+	var progress, output strings.Builder
+	bug, err := Check("tcPingPong", project, 100, nil, &progress, &output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(project, "PCheckerOutput", "prdb", "tcPingPong.trace.json")
+	if bug == nil || bug.Test != "tcPingPong" || bug.Trace != want {
+		t.Fatalf("Check found %+v, want the bug in tcPingPong saved as %s", bug, want)
+	}
+	// The trace is kept after the checker's own files are gone.
+	if _, err := trace.Load(bug.Trace); err != nil {
+		t.Error(err)
+	}
+	if !strings.Contains(output.String(), "Loading project file") || !strings.Contains(output.String(), "..... Writing") {
+		t.Errorf("the P tool's output wasn't passed on: %q", output.String())
+	}
+	if strings.Contains(progress.String(), "Loading project file") {
+		t.Errorf("the P tool's output went to progress")
+	}
+	if _, err := os.Stat(filepath.Join(project, "PGenerated")); !os.IsNotExist(err) {
+		t.Errorf("the compiler's empty output directory is left in the project")
+	}
+
+	params := t.TempDir()
+	if err := os.CopyFS(params, os.DirFS("../../testdata/params")); err != nil {
+		t.Fatal(err)
+	}
+	if bug, err := Check("tcQuiet", params, 10, nil, nil, nil); bug != nil || err != nil {
+		t.Errorf("Check of a test case that passes = %+v, %v", bug, err)
+	}
+	if _, err := Check("tcNope", params, 10, nil, nil, nil); err == nil || !strings.Contains(err.Error(), "its tests are: tcHello") {
+		t.Errorf("Check of a missing test case: %v", err)
+	}
+}
+
+func TestCheckWithoutTheTool(t *testing.T) {
+	if _, err := Check("tc", t.TempDir(), 10, []string{"p-no-such-tool"}, nil, nil); !errors.Is(err, ErrNoTool) {
+		t.Errorf("Check without the P tool: %v, want ErrNoTool", err)
 	}
 }

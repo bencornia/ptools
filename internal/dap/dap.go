@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/bencornia/ptools/internal/replay"
 	"github.com/bencornia/ptools/internal/session"
 	"github.com/bencornia/ptools/internal/source"
 	"github.com/bencornia/ptools/internal/trace"
@@ -274,6 +275,10 @@ func (s *server) launch(req *godap.LaunchRequest) {
 		Project: args.Project, Compiler: args.Compiler, Progress: consoleWriter{s},
 		TestCase: args.TestCase, Schedules: args.Schedules, Schedule: args.Schedule,
 	})
+	if errors.Is(err, replay.ErrNoTool) {
+		s.fail(req, err.Error()+"; set the launch configuration's compiler, or in VS Code the p.command setting, to the command that runs it")
+		return
+	}
 	if err != nil {
 		s.fail(req, err.Error())
 		return

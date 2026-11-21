@@ -43,6 +43,27 @@ each of its cases (`tcMyTest___n_1`, `tcMyTest___n_2`) in turn, or by a
 case's. If PChecker finds no bug, prdb replays one run of the test instead,
 so a test that passes can be stepped through too.
 
+### Checking a test case
+
+`prdb check` does the checking on its own, without debugging, for a
+terminal or a script; VS Code's Run test runs it:
+
+```sh
+prdb check tcMyTest
+```
+
+It shows the P tool's output as it goes, on standard error. If PChecker
+finds a bug, it saves the trace as above, prints the trace's path, and
+exits with status 1; otherwise it exits with status 0. `--json` prints
+`{"bug": {"test": …, "trace": …}}`, or `{"bug": null}`, instead.
+`--schedules` sets how many schedules to explore, `--project` the
+project's directory, which is otherwise the nearest with a `.pproj` from
+the current directory up, and `--compiler` the command that runs the P
+tool, once for each of its arguments. Like the debugger, it compiles into
+a temporary directory, so it leaves no `PGenerated` behind.
+
+### Running PChecker yourself
+
 Or run PChecker yourself:
 
 ```sh

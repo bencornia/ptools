@@ -2,7 +2,7 @@
   "name": "ptools",
   "displayName": "P",
   "description": "P language support: the plsp language server, pfmt formatting, and the prdb replay debugger",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "bencornia",
   "repository": {
     "type": "git",

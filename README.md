@@ -37,7 +37,7 @@ and prdb's READMEs say where they look for it.
 cd editors/vscode
 npm install
 npx @vscode/vsce package --skip-license
-code --install-extension ptools-0.6.0.vsix
+code --install-extension ptools-0.7.0.vsix
 ```
 
 Set `plsp.path` or `prdb.path` if the binaries aren't on the `PATH` VS

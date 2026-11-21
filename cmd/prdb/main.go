@@ -4,11 +4,13 @@
 //
 // By default it speaks the Debug Adapter Protocol over stdin and stdout,
 // for editors. prdb list prints each step of a trace with where in the
-// source it happened, and prdb diagram draws a trace as an SVG space-time
-// diagram.
+// source it happened, prdb diagram draws a trace as an SVG space-time
+// diagram, and prdb check checks a test case until PChecker finds a bug.
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,6 +21,7 @@ import (
 	"github.com/bencornia/ptools/internal/cli"
 	"github.com/bencornia/ptools/internal/dap"
 	"github.com/bencornia/ptools/internal/diagram"
+	"github.com/bencornia/ptools/internal/replay"
 	"github.com/bencornia/ptools/internal/session"
 	"github.com/spf13/cobra"
 )
@@ -53,7 +56,7 @@ func rootCommand() *cobra.Command {
 		},
 	}
 	root.Flags().BoolVarP(&verbose, "verbose", "v", false, "log the protocol messages to stderr")
-	root.AddCommand(listCommand(), diagramCommand())
+	root.AddCommand(listCommand(), diagramCommand(), checkCommand())
 	return root
 }
 
@@ -88,7 +91,7 @@ func listCommand() *cobra.Command {
 		Args: traceArgs(&opts),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Progress = cmd.ErrOrStderr()
-			return printSteps(cmd.OutOrStdout(), first(args), opts)
+			return hint(printSteps(cmd.OutOrStdout(), first(args), opts))
 		},
 	}
 	traceFlags(cmd, &opts)
@@ -108,7 +111,7 @@ func diagramCommand() *cobra.Command {
 		Args: traceArgs(&opts),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Progress = cmd.ErrOrStderr()
-			return drawDiagram(cmd.OutOrStdout(), first(args), opts, out, machines, steps, monitors)
+			return hint(drawDiagram(cmd.OutOrStdout(), first(args), opts, out, machines, steps, monitors))
 		},
 	}
 	traceFlags(cmd, &opts)
@@ -118,6 +121,71 @@ func diagramCommand() *cobra.Command {
 	flags.StringVar(&steps, "steps", "", "the steps to draw, as first-last, first- or -last (default: all)")
 	flags.BoolVar(&monitors, "monitors", true, "draw the spec monitors")
 	return cmd
+}
+
+func checkCommand() *cobra.Command {
+	var project string
+	var schedules int
+	var compiler []string
+	var asJSON bool
+	cmd := &cobra.Command{
+		Use:   "check testcase",
+		Short: "Check a test case with PChecker until it finds a bug",
+		Long: "Compiles the P project and checks the test case with PChecker, exploring up\n" +
+			"to --schedules schedules, until it finds a bug. A parameterised test can be\n" +
+			"named for all its cases, which are checked in turn. The P tool's output goes\n" +
+			"to standard error.\n\n" +
+			"If PChecker finds a bug, check saves its trace and schedule in\n" +
+			"PCheckerOutput/prdb, prints the trace's path, and exits with status 1;\n" +
+			"prdb list and diagram, and the debugger, take the trace. Otherwise it exits\n" +
+			"with status 0.",
+		Args: cli.Args(cobra.ExactArgs(1)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if project == "" {
+				project = session.FindProject(".")
+			}
+			stderr := cmd.ErrOrStderr()
+			bug, err := replay.Check(args[0], project, schedules, compiler, stderr, stderr)
+			if err != nil {
+				return hint(err)
+			}
+			stdout := cmd.OutOrStdout()
+			if bug == nil {
+				fmt.Fprintf(stderr, "PChecker found no bug in %s in %d schedules\n", args[0], schedules)
+			}
+			switch {
+			case asJSON:
+				out, err := json.Marshal(struct {
+					Bug *replay.Bug `json:"bug"`
+				}{bug})
+				if err != nil {
+					return err
+				}
+				fmt.Fprintf(stdout, "%s\n", out)
+			case bug != nil:
+				fmt.Fprintln(stdout, bug.Trace)
+			}
+			if bug != nil {
+				return cli.Exit(1)
+			}
+			return nil
+		},
+	}
+	flags := cmd.Flags()
+	flags.StringVar(&project, "project", "", "the P project's directory (default: the nearest, from the current directory up, with a .pproj)")
+	flags.IntVar(&schedules, "schedules", 1000, "how many schedules to explore")
+	flags.StringArrayVar(&compiler, "compiler", []string{"p"}, "the command that runs the P tool; repeat it for each of the command's arguments")
+	flags.BoolVar(&asJSON, "json", false, `print {"bug": {"test", "trace"}}, or {"bug": null}, instead of the trace's path`)
+	return cmd
+}
+
+// hint adds how to set the P tool's command to an error saying it can't
+// be found.
+func hint(err error) error {
+	if errors.Is(err, replay.ErrNoTool) {
+		return fmt.Errorf("%w; pass --compiler with the command that runs it", err)
+	}
+	return err
 }
 
 func first(args []string) string {

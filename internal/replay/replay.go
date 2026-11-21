@@ -59,17 +59,41 @@ func Schedule(schedule, project string, compiler []string, progress io.Writer) (
 	return traces[0], c.clean, nil
 }
 
-// TestCase compiles the P project in project and checks the test case
-// named name, exploring up to schedules schedules, until PChecker finds a
-// bug. A parameterised test can be named for all its cases, which P names
+// ErrNoTool is returned when the command that runs the P tool can't be
+// found. Callers say how to set it.
+var ErrNoTool = errors.New("can't find the P tool")
+
+// Bug is a bug PChecker found in a test case: the case it was in, which
+// for a parameterised test is one of its cases, and the bug's trace.
+type Bug struct {
+	Test  string `json:"test"`
+	Trace string `json:"trace"`
+}
+
+// Check compiles the P project in project and checks the test case named
+// name, exploring up to schedules schedules, until PChecker finds a bug. A
+// parameterised test can be named for all its cases, which P names
 // <name>___<param>_<value>__<param>_<value>...: they're checked in turn,
-// until one finds a bug. It returns the bug's trace, which it also saves,
-// with its schedule, as PCheckerOutput/prdb/<case>.trace.json and
-// .schedule in the project, for replaying later.
-//
-// If no schedule finds a bug, it replays one schedule of the test case,
-// or of the first of a parameterised test's, with --verbose, and returns
-// that trace, which clean removes, and bug false.
+// until one finds a bug. It returns the bug, whose trace it saves, with its
+// schedule, as PCheckerOutput/prdb/<case>.trace.json and .schedule in the
+// project, for replaying later; or nil if PChecker found none. progress, if
+// not nil, gets a line as each stage starts, and output the P tool's own
+// output as it runs.
+func Check(name, project string, schedules int, compiler []string, progress, output io.Writer) (*Bug, error) {
+	c, err := newChecker(project, compiler, progress)
+	if err != nil {
+		return nil, err
+	}
+	defer c.clean()
+	c.output = output
+	bug, _, _, err := c.check(name, schedules)
+	return bug, err
+}
+
+// TestCase checks the test case named name as Check does, and returns the
+// bug's trace. If no schedule finds a bug, it replays one schedule of the
+// test case, or of the first of a parameterised test's, with --verbose,
+// and returns that trace, which clean removes, and bug false.
 func TestCase(name, project string, schedules int, compiler []string, progress io.Writer) (tracePath string, bug bool, clean func(), err error) {
 	c, err := newChecker(project, compiler, progress)
 	if err != nil {
@@ -80,31 +104,17 @@ func TestCase(name, project string, schedules int, compiler []string, progress i
 			c.clean()
 		}
 	}()
-	dll, err := c.compile()
+	found, cases, dll, err := c.check(name, schedules)
 	if err != nil {
 		return "", false, nil, err
 	}
-
-	c.say("Checking %s, for up to %d schedules", name, schedules)
-	out, runErr := c.run("check", dll, "--testcase", name, "--schedules", strconv.Itoa(schedules), "--outdir", filepath.Join(c.dir, "check"))
-	cases := ofTest(c.testRuns(out), name)
-	if len(cases) == 0 {
-		tests, _ := c.run("check", dll, "--list-tests")
-		return "", false, nil, fmt.Errorf("the project has no test case %s; its tests are: %s", name, strings.Join(listedTests(tests), ", "))
-	}
-	for _, r := range cases {
-		if r.trace != "" {
-			tracePath, err := c.save(r)
-			return tracePath, true, c.clean, err
-		}
-	}
-	if runErr != nil && !strings.Contains(string(out), "Found 0 bugs") {
-		return "", false, nil, fmt.Errorf("checking %s: %w", name, runErr)
+	if found != nil {
+		return found.Trace, true, c.clean, nil
 	}
 
 	one := cases[0].test
 	c.say("PChecker found no bug in %s in %d schedules; replaying one run of %s", name, schedules, one)
-	out, runErr = c.run("check", dll, "--testcase", one, "--schedules", "1", "--verbose", "--outdir", filepath.Join(c.dir, "run"))
+	out, runErr := c.run("check", dll, "--testcase", one, "--schedules", "1", "--verbose", "--outdir", filepath.Join(c.dir, "run"))
 	for _, r := range c.testRuns(out) {
 		if r.test == one && r.trace != "" {
 			return r.trace, false, c.clean, nil
@@ -114,6 +124,37 @@ func TestCase(name, project string, schedules int, compiler []string, progress i
 		runErr = errors.New("p check wrote no trace")
 	}
 	return "", false, nil, fmt.Errorf("running %s: %w", one, runErr)
+}
+
+// check compiles the project and checks the test case name. It returns the
+// bug PChecker found, if any, the test cases it ran, which are name or its
+// cases, and the assembly it checked.
+func (c *checker) check(name string, schedules int) (*Bug, []testRun, string, error) {
+	dll, err := c.compile()
+	if err != nil {
+		return nil, nil, "", err
+	}
+
+	c.say("Checking %s, for up to %d schedules", name, schedules)
+	out, runErr := c.run("check", dll, "--testcase", name, "--schedules", strconv.Itoa(schedules), "--outdir", filepath.Join(c.dir, "check"))
+	cases := ofTest(c.testRuns(out), name)
+	if len(cases) == 0 {
+		tests, _ := c.run("check", dll, "--list-tests")
+		return nil, nil, "", fmt.Errorf("the project has no test case %s; its tests are: %s", name, strings.Join(listedTests(tests), ", "))
+	}
+	for _, r := range cases {
+		if r.trace != "" {
+			tracePath, err := c.save(r)
+			if err != nil {
+				return nil, nil, "", err
+			}
+			return &Bug{Test: r.test, Trace: tracePath}, cases, dll, nil
+		}
+	}
+	if runErr != nil && !strings.Contains(string(out), "Found 0 bugs") {
+		return nil, nil, "", fmt.Errorf("checking %s: %w", name, runErr)
+	}
+	return nil, cases, dll, nil
 }
 
 // save copies a bug's trace and schedule into the project, and returns
@@ -219,6 +260,8 @@ type checker struct {
 	args, env []string
 	dir       string
 	progress  io.Writer
+	// output, if not nil, gets the P tool's output as it runs.
+	output io.Writer
 }
 
 func newChecker(project string, compiler []string, progress io.Writer) (*checker, error) {
@@ -227,7 +270,7 @@ func newChecker(project string, compiler []string, progress io.Writer) (*checker
 	}
 	command, env, err := ptool.Find(compiler)
 	if err != nil {
-		return nil, fmt.Errorf("replaying needs the P compiler, and %q isn't on the PATH; set the launch configuration's compiler to the command that runs it", compiler[0])
+		return nil, fmt.Errorf("%w: %q isn't on the PATH or in ~/.dotnet/tools", ErrNoTool, compiler[0])
 	}
 	pprojs, _ := filepath.Glob(filepath.Join(project, "*.pproj"))
 	if len(pprojs) == 0 {
@@ -257,11 +300,17 @@ func (c *checker) run(args ...string) ([]byte, error) {
 	cmd := exec.Command(c.command, append(slices.Clone(c.args), args...)...)
 	cmd.Dir = c.project
 	cmd.Env = c.env
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return out, fmt.Errorf("p %s: %w\n%s", args[0], err, strings.TrimSpace(string(out)))
+	var out bytes.Buffer
+	var w io.Writer = &out
+	if c.output != nil {
+		w = io.MultiWriter(&out, c.output)
 	}
-	return out, nil
+	// The same writer for both, so they're written one at a time.
+	cmd.Stdout, cmd.Stderr = w, w
+	if err := cmd.Run(); err != nil {
+		return out.Bytes(), fmt.Errorf("p %s: %w\n%s", args[0], err, strings.TrimSpace(out.String()))
+	}
+	return out.Bytes(), nil
 }
 
 // compile builds the project for PChecker, and returns the assembly to
