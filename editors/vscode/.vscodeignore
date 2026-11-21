@@ -1,0 +1,6 @@
+# The extension ships as dist/extension.js, which npm run build bundles
+# from these sources and node_modules.
+**
+!dist/extension.js
+!package.json
+!language-configuration.json

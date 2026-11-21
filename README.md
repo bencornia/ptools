@@ -111,14 +111,15 @@ in `internal/version` and in `editors/vscode/package.json` (and
 version, as in `v0.8.0`:
 
 ```sh
-git tag -a v0.8.0 -m "$(cat notes.md)"
+git tag -a --cleanup=verbatim -F notes.md v0.8.0
 git push origin v0.8.0
 ```
 
 The [release workflow](.github/workflows/release.yml) then tests and builds
 the tools for Linux and macOS, on amd64 and arm64,
 packages the extension, and attaches them and a `checksums.txt` to the
-tag's release, which it makes with the tag's message as its notes.
+tag's release, which it makes with the tag's message as its notes
+(`--cleanup=verbatim` keeps their `#` headings).
 `install.sh` installs from the latest release. To try the builds without
 releasing, run the workflow from the Actions tab.
 

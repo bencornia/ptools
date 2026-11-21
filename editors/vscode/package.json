@@ -2,7 +2,7 @@
   "name": "ptools",
   "displayName": "P",
   "description": "P language support: the plsp language server, pfmt formatting, and the prdb replay debugger",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "publisher": "bencornia",
   "license": "MIT",
   "repository": {
@@ -17,7 +17,11 @@
     "Debuggers",
     "Formatters"
   ],
-  "main": "./extension.js",
+  "main": "./dist/extension.js",
+  "scripts": {
+    "build": "esbuild extension.js --bundle --platform=node --format=cjs --external:vscode --minify-whitespace --minify-syntax --outfile=dist/extension.js",
+    "vscode:prepublish": "npm run build"
+  },
   "activationEvents": [
     "onCommand:prdb.pickTrace",
     "onCommand:prdb.pickTestCase"
@@ -157,9 +161,13 @@
               },
               "compiler": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "description": "The command that runs the P tool, to replay a schedule or check a test case.",
-                "default": ["p"]
+                "default": [
+                  "p"
+                ]
               }
             }
           }
@@ -199,5 +207,8 @@
   },
   "dependencies": {
     "vscode-languageclient": "10.1.2"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
   }
 }
