@@ -29,7 +29,7 @@ func setup(t *testing.T) (home, bin string) {
 			t.Fatal(err)
 		}
 	}
-	for _, tool := range []string{"sh", "bash", "cat", "mkdir", "chmod", "rm", "git", "cc", "as", "ld"} {
+	for _, tool := range []string{"sh", "bash", "cat", "mkdir", "chmod", "rm", "head", "grep", "git", "cc", "as", "ld"} {
 		if path, err := exec.LookPath(tool); err == nil {
 			if err := os.Symlink(path, filepath.Join(sys, tool)); err != nil {
 				t.Fatal(err)
@@ -380,4 +380,78 @@ func TestVSCodeApp(t *testing.T) {
 	d, out := newDoctor(false)
 	d.vscode()
 	expect(t, out.String(), "the code command isn't on your PATH", "✓ the ptools extension, bencornia.ptools 1.2.3")
+}
+
+// fakeNvim is an nvim that gives P files the p filetype and starts plsp
+// only when ptools.lua is in its plugin directory, as Neovim would with
+// the plugin the doctor adds.
+const fakeNvim = `case $1 in
+--version) echo "NVIM v${FAKE_NVIM_VERSION:-0.12.6}"; exit;;
+esac
+config="$HOME/.config/nvim"
+if [ -f "$config/plugin/ptools.lua" ] && head -1 "$config/plugin/ptools.lua" | grep -q 'from ptools'; then
+	printf 'config=%s\nfiletype=p\nclient=plsp\tplsp\n' "$config" > "$PLSP_DOCTOR_OUT"
+else
+	printf 'config=%s\nfiletype=progress\n' "$config" > "$PLSP_DOCTOR_OUT"
+fi
+`
+
+func TestNeovim(t *testing.T) {
+	home, bin := setup(t)
+	script(t, filepath.Join(bin, "nvim"), fakeNvim)
+	plugin := filepath.Join(home, ".config", "nvim", "plugin", "ptools.lua")
+
+	d, out := newDoctor(false)
+	d.neovim()
+	expect(t, out.String(), "✗ Neovim gives .p files the filetype progress, not p")
+	if d.problems != 1 || d.fixable != 1 {
+		t.Errorf("problems %d, fixable %d; want 1 and 1", d.problems, d.fixable)
+	}
+
+	d, out = newDoctor(true)
+	d.neovim()
+	expect(t, out.String(), "→ adding ~/.config/nvim/plugin/ptools.lua")
+	if d.problems != 0 {
+		t.Errorf("problems %d; want 0:\n%s", d.problems, out)
+	}
+	if text, _ := os.ReadFile(plugin); string(text) != neovimPlugin {
+		t.Errorf("ptools.lua is %q", text)
+	}
+
+	d, out = newDoctor(false)
+	d.neovim()
+	expect(t, out.String(), "✓ Neovim 0.12 starts plsp for P files")
+}
+
+func TestNeovimLeavesOtherPlugins(t *testing.T) {
+	home, bin := setup(t)
+	script(t, filepath.Join(bin, "nvim"), fakeNvim)
+	plugin := filepath.Join(home, ".config", "nvim", "plugin", "ptools.lua")
+	if err := os.MkdirAll(filepath.Dir(plugin), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(plugin, []byte("-- mine\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	d, out := newDoctor(true)
+	d.neovim()
+	expect(t, out.String(), "isn't the doctor's to replace")
+	if text, _ := os.ReadFile(plugin); string(text) != "-- mine\n" {
+		t.Errorf("replaced the user's ptools.lua with %q", text)
+	}
+	if d.problems != 1 || d.fixable != 0 {
+		t.Errorf("problems %d, fixable %d; want 1 and 0", d.problems, d.fixable)
+	}
+}
+
+func TestNeovimTooOld(t *testing.T) {
+	_, bin := setup(t)
+	script(t, filepath.Join(bin, "nvim"), fakeNvim)
+	t.Setenv("FAKE_NVIM_VERSION", "0.10.4")
+	d, out := newDoctor(true)
+	d.neovim()
+	expect(t, out.String(), "Neovim is version 0.10, and plsp's setup needs 0.11 or later")
+	if d.problems != 1 || d.fixable != 0 {
+		t.Errorf("problems %d, fixable %d; want 1 and 0", d.problems, d.fixable)
+	}
 }

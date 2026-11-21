@@ -1,7 +1,8 @@
 // Package doctor checks that ptools is set up to work: the four commands,
-// the P compiler, and the editors that run them, Helix and VS Code. It can
-// fix most of what it finds: it installs the P compiler, with .NET if need
-// be, configures Helix and builds the grammar for it, and installs the VS
+// the P compiler, and the editors that run them, Helix, Neovim and VS Code.
+// It can fix most of what it finds: it installs the P compiler, with .NET
+// if need be, configures Helix and builds the grammar for it, adds a
+// plugin to Neovim's configuration that starts plsp, and installs the VS
 // Code extension.
 package doctor
 
@@ -60,6 +61,7 @@ func (d *Doctor) Run() bool {
 	d.tools()
 	d.pCompiler()
 	d.helix()
+	d.neovim()
 	d.vscode()
 	fmt.Fprintln(d.Out)
 	switch {

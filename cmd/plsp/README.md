@@ -140,7 +140,7 @@ file's names resolve across its project; standard input's within itself.
 
 `plsp doctor` checks that the ptools commands are installed, on your
 `PATH` and all the same release; that plsp and prdb can run the P compiler;
-and that Helix and VS Code, if you have them, are set up for P. It exits
+and that Helix, Neovim and VS Code, if you have them, are set up for P. It exits
 with status 1 if anything is wrong. `plsp doctor --fix` fixes what it can,
 as the [top-level README](../../README.md#installing) describes, and says
 how to fix the rest.
@@ -208,19 +208,27 @@ definition, references, hover, rename and symbols.
 
 ### Neovim
 
-For Neovim 0.11 or later. Neovim detects `.p` files as Pascal or Progress,
-so claim the extension first. With no tree-sitter parser for P, the
-server's semantic tokens do the highlighting.
+For Neovim 0.11 or later. `plsp doctor` checks the setup by opening a P
+file in Neovim, with your configuration, and seeing whether plsp starts.
+If it doesn't, `plsp doctor --fix` adds the first part of what's below
+(the filetype and the server) to Neovim's configuration directory, as
+`plugin/ptools.lua`, rather than change your own configuration. Move it
+into your configuration if you like; the doctor only replaces it while its
+first line is unchanged.
+
+Neovim detects `.p` files as Pascal or Progress, so claim the extension
+first. With no tree-sitter parser for P, the server's semantic tokens do
+the highlighting.
 
 ```lua
 vim.filetype.add({ extension = { p = 'p' } })
 
-vim.lsp.config('p_lsp', {
+vim.lsp.config('plsp', {
   cmd = { 'plsp' },
   filetypes = { 'p' },
   root_markers = { '.git' },
 })
-vim.lsp.enable('p_lsp')
+vim.lsp.enable('plsp')
 
 -- Optional: fold with the server's folding ranges.
 vim.api.nvim_create_autocmd('FileType', {
