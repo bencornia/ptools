@@ -165,7 +165,7 @@ auto-format = true
 
 [[grammar]]
 name = "p"
-source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "899bd465462a536d89f8fb583dccdd70962eca51" }
+source = { git = "https://github.com/bencornia/tree-sitter-p", rev = "6057d17685c680544631ad0e0b43688ab870e4cd" }
 ```
 
 Then build the grammar and install its highlight queries. Helix doesn't
