@@ -4,13 +4,15 @@ Tools for the [P programming language](https://github.com/p-org/P), built on
 the [tree-sitter-p](https://github.com/bencornia/tree-sitter-p) grammar:
 
 - [plsp](cmd/plsp), a language server: diagnostics, type checking with the
-  P compiler on save, navigation, rename, completion, lint checks, test case
-  lenses, and reference documentation with `plsp doc`.
+  P compiler on save, navigation, rename, completion, lint checks, and test
+  case lenses.
 - [prdb](cmd/prdb), a replay debugger for PChecker's traces, over the Debug
   Adapter Protocol, and space-time diagrams of them.
 - [pfmt](cmd/pfmt), a gofmt-style formatter. plsp formats with it too.
+- [pdoc](cmd/pdoc), which writes reference documentation for P projects as
+  AsciiDoc, organized like Go's package documentation.
 - [editors/vscode](editors/vscode), the P extension for VS Code, which runs
-  all three.
+  plsp and prdb.
 
 ## Installing
 
@@ -18,8 +20,8 @@ the [tree-sitter-p](https://github.com/bencornia/tree-sitter-p) grammar:
 go build -o ~/.local/bin/ ./cmd/...
 ```
 
-That builds `plsp`, `prdb` and `pfmt` into `~/.local/bin`, which the editor
-setups expect to be on your `PATH`. Building requires cgo (a C compiler),
+That builds `plsp`, `prdb`, `pfmt` and `pdoc` into `~/.local/bin`, which
+the editor setups expect to be on your `PATH`. Building requires cgo (a C compiler),
 since tree-sitter is a C library.
 
 Each takes `--help`, as do plsp's and prdb's subcommands, and

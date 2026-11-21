@@ -17,16 +17,17 @@ import (
 	sitter "github.com/tree-sitter/go-tree-sitter"
 )
 
-func docCommand() *cobra.Command {
+func rootCommand() *cobra.Command {
 	var o docOptions
 	cmd := &cobra.Command{
-		Use:   "doc [path ...]",
+		Use:   "pdoc [path ...]",
 		Short: "Write AsciiDoc reference documentation for P projects",
 		Long: "Writes AsciiDoc reference documentation for the P projects (.pproj files)\n" +
 			"among the paths and under the directories among them, the current one by\n" +
 			"default. A project's page opens with the README.adoc beside its .pproj, if\n" +
 			"there is one. Without -o, it prints the page of the one project found.\n" +
 			"Asciidoctor turns the pages into HTML.",
+		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, paths []string) error {
 			return cli.Exit(docs(paths, o, cmd.OutOrStdout(), cmd.ErrOrStderr()))
 		},

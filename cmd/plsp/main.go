@@ -2,10 +2,8 @@
 //
 // Run as plsp lint [--json] [path ...], it checks P files for lint problems
 // instead: naming, unused declarations, and the other checks .plint.toml
-// configures. Run as plsp doc [-o dir] [--private] [path ...], it writes
-// AsciiDoc reference documentation for P projects. Run as plsp highlight
-// [file], it prints a file's semantic tokens as JSON, for highlighting P
-// outside an editor.
+// configures. Run as plsp highlight [file], it prints a file's semantic
+// tokens as JSON, for highlighting P outside an editor.
 package main
 
 import (
@@ -63,6 +61,6 @@ func rootCommand() *cobra.Command {
 	flags.Bool("stdio", true, "communicate over stdin/stdout")
 	flags.StringVar(&compiler, "compiler", "p", "command that runs the P compiler, for type-check diagnostics on save; empty turns them off")
 	flags.DurationVar(&compileTimeout, "compile-timeout", time.Minute, "how long a type check may take")
-	root.AddCommand(lintCommand(), docCommand(), highlightCommand())
+	root.AddCommand(lintCommand(), highlightCommand())
 	return root
 }
