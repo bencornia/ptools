@@ -17,6 +17,9 @@ off, and the log says so. To use a different command, pass
 `--compiler "<command>"`, or `--compiler ""` to turn it off. Generated code goes
 to a temporary directory, not your project.
 
+`plsp doctor --fix` installs the P compiler, and .NET 8 if need be,
+[as the top-level README says](../../README.md#installing).
+
 `p` is a .NET tool. An editor started from a desktop menu often doesn't
 have the `PATH` your shell profile sets, so if `p` isn't on the `PATH`,
 plsp looks where `dotnet tool install --global P` puts it,
@@ -133,6 +136,15 @@ semantic token legend (`event`, `class`, `namespace`, `function`,
 `keyword`, ...). Punctuation, and names that don't resolve, are left out. A
 file's names resolve across its project; standard input's within itself.
 
+## Checking your setup
+
+`plsp doctor` checks that the ptools commands are installed, on your
+`PATH` and all the same release; that plsp and prdb can run the P compiler;
+and that Helix and VS Code, if you have them, are set up for P. It exits
+with status 1 if anything is wrong. `plsp doctor --fix` fixes what it can,
+as the [top-level README](../../README.md#installing) describes, and says
+how to fix the rest.
+
 ## Editor setup
 
 Open the folder that holds your `.pproj` files (or a parent of them) as the
@@ -142,7 +154,12 @@ parent directories for a `.pproj` that lists it.
 ### Helix
 
 Helix doesn't use semantic tokens, so colors come from the tree-sitter-p
-grammar. Add this to `~/.config/helix/languages.toml`:
+grammar. `plsp doctor --fix` sets Helix up: it adds what's below to
+`languages.toml` if P isn't there, keeps the grammar's `rev` at the commit
+plsp parses with, and builds the grammar and installs its queries. Run it
+again after upgrading ptools.
+
+To set it up by hand instead, add this to `~/.config/helix/languages.toml`:
 
 ```toml
 # Only fetch and build P's grammar with `hx --grammar`; Helix's own
@@ -179,7 +196,7 @@ hx --health p
 ```
 
 To pick up grammar changes, update `rev` and run the last three commands
-again. `space d` lists errors (syntax errors as you type, type errors on
+again, or run `plsp doctor --fix`. `space d` lists errors (syntax errors as you type, type errors on
 save), and `gd`, `gr`, `space k`, `space r`, `space s` and `space S` are
 definition, references, hover, rename and symbols.
 

@@ -1,0 +1,101 @@
+# Builds ptools for each platform on a tag, and attaches the builds, the VS
+# Code extension and their checksums to the tag's release. Run it by hand
+# to try the builds without releasing them.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, goos: linux, goarch: amd64 }
+          - { runner: ubuntu-24.04-arm, goos: linux, goarch: arm64 }
+          - { runner: macos-latest, goos: darwin, goarch: arm64 }
+          # Apple's clang cross-compiles to Intel Macs.
+          - { runner: macos-latest, goos: darwin, goarch: amd64, cc: clang -arch x86_64, cross: true }
+          - { runner: windows-latest, goos: windows, goarch: amd64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Test
+        if: ${{ !matrix.cross }}
+        run: go test ./...
+      - name: Build
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CROSS_CC: ${{ matrix.cc }}
+        run: |
+          if [ -n "$CROSS_CC" ]; then export CC="$CROSS_CC"; fi
+          tags= ldflags="-s -w"
+          if [ "$GOOS" = linux ]; then
+            # Link statically, so the tools run on any distribution.
+            tags=netgo,osusergo ldflags="$ldflags -extldflags=-static"
+          fi
+          mkdir -p dist/ptools
+          go build -trimpath -tags "$tags" -ldflags "$ldflags" -o dist/ptools/ ./cmd/...
+          cp README.md dist/ptools/
+          name=ptools_${GOOS}_${GOARCH}
+          cd dist/ptools
+          if [ "$GOOS" = windows ]; then 7z a -tzip "../$name.zip" . > /dev/null; else tar -czf "../$name.tar.gz" *; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ptools_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/ptools_*
+
+  vsix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Package
+        working-directory: editors/vscode
+        run: |
+          npm ci
+          npx --yes @vscode/vsce package --skip-license
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: editors/vscode/*.vsix
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [build, vsix]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the version
+        run: |
+          v=${GITHUB_REF_NAME#v}
+          grep -q "Version = \"$v\"" internal/version/version.go || { echo "internal/version isn't $v"; exit 1; }
+          grep -q "\"version\": \"$v\"" editors/vscode/package.json || { echo "the extension's version isn't $v"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          cd dist
+          sha256sum * > checksums.txt
+          gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 ||
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-from-tag
+          gh release upload "$GITHUB_REF_NAME" * --clobber
