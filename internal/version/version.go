@@ -2,7 +2,7 @@
 package version
 
 // Version is the ptools release, as tagged in git without its "v".
-const Version = "0.8.0"
+const Version = "0.9.0"
 
 // Grammar is the tree-sitter-p commit that go.mod requires, in full, for
 // pinning editors' builds of the grammar to the one plsp parses with.
