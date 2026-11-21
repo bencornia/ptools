@@ -126,3 +126,7 @@ releasing, run the workflow from the Actions tab.
 When go.mod's tree-sitter-p changes, set `version.Grammar` to the new
 commit, which `plsp doctor` pins Helix's grammar to; a test checks that
 they match.
+
+## License
+
+MIT

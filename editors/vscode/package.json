@@ -4,6 +4,7 @@
   "description": "P language support: the plsp language server, pfmt formatting, and the prdb replay debugger",
   "version": "0.7.0",
   "publisher": "bencornia",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/bencornia/ptools"

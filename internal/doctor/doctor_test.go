@@ -355,3 +355,29 @@ func TestVSCode(t *testing.T) {
 	d.vscode()
 	expect(t, out.String(), "✓ the ptools extension, bencornia.ptools 1.2.3")
 }
+
+func TestHelixNotInstalled(t *testing.T) {
+	home, _ := setup(t)
+	dir := filepath.Join(home, ".config", "helix")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	d, out := newDoctor(true)
+	d.helix()
+	expect(t, out.String(), "Helix: not installed")
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Errorf("set up Helix's leftover configuration: %v", entries)
+	}
+}
+
+func TestVSCodeApp(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("VS Code's app is only looked in on macOS")
+	}
+	home, _ := setup(t)
+	script(t, filepath.Join(home, "Applications", "Visual Studio Code.app", "Contents", "Resources", "app", "bin", "code"),
+		"echo bencornia.ptools@1.2.3\n")
+	d, out := newDoctor(false)
+	d.vscode()
+	expect(t, out.String(), "the code command isn't on your PATH", "✓ the ptools extension, bencornia.ptools 1.2.3")
+}

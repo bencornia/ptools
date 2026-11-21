@@ -48,7 +48,7 @@ jobs:
           fi
           mkdir -p dist/ptools
           go build -trimpath -tags "$tags" -ldflags "$ldflags" -o dist/ptools/ ./cmd/...
-          cp README.md dist/ptools/
+          cp README.md LICENSE dist/ptools/
           name=ptools_${GOOS}_${GOARCH}
           cd dist/ptools
           if [ "$GOOS" = windows ]; then 7z a -tzip "../$name.zip" . > /dev/null; else tar -czf "../$name.tar.gz" *; fi

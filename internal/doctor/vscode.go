@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -17,12 +19,15 @@ const (
 // vscode checks that VS Code has this release's extension, installing it
 // from the release to fix that.
 func (d *Doctor) vscode() {
-	code, err := exec.LookPath("code")
-	if err != nil {
+	code, onPath := findCode()
+	if code == "" {
 		d.skip("VS Code", "not installed")
 		return
 	}
 	d.section("VS Code")
+	if !onPath {
+		d.note("the code command isn't on your PATH, so the doctor uses the app's, %s. For your shell, run Shell Command: Install 'code' command in PATH from VS Code's Command Palette", tilde(code))
+	}
 	out, err := run(nil, code, "--list-extensions", "--show-versions")
 	if err != nil {
 		d.bad(false, "code --list-extensions failed: %s", firstLine(out))
@@ -69,4 +74,24 @@ func (d *Doctor) vscode() {
 	if err != nil {
 		d.failed(err)
 	}
+}
+
+// findCode returns VS Code's code command, and whether it's on the PATH.
+// On macOS, VS Code doesn't put it there until asked to, so findCode looks
+// in the app too.
+func findCode() (string, bool) {
+	if path, err := exec.LookPath("code"); err == nil {
+		return path, true
+	}
+	if runtime.GOOS != "darwin" {
+		return "", false
+	}
+	home, _ := os.UserHomeDir()
+	for _, apps := range []string{"/Applications", filepath.Join(home, "Applications")} {
+		code := filepath.Join(apps, "Visual Studio Code.app", "Contents", "Resources", "app", "bin", "code")
+		if exists(code) {
+			return code, false
+		}
+	}
+	return "", false
 }

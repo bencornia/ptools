@@ -32,13 +32,13 @@ type helixLanguages struct {
 // helix checks Helix's configuration for P, and its build of the grammar,
 // which Helix highlights and indents with.
 func (d *Doctor) helix() {
-	dir := helixConfigDir()
 	_, hx := exec.LookPath("hx")
 	_, helix := exec.LookPath("helix") // as some distributions name it
-	if hx != nil && helix != nil && !exists(dir) {
+	if hx != nil && helix != nil {
 		d.skip("Helix", "not installed")
 		return
 	}
+	dir := helixConfigDir()
 	d.section("Helix")
 	if d.helixConfig(filepath.Join(dir, "languages.toml")) {
 		d.helixGrammar(filepath.Join(dir, "runtime"))
